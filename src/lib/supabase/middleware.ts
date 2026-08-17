@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl
+
+  // API routes handle their own auth — never redirect them
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -27,8 +34,6 @@ export async function updateSession(request: NextRequest) {
 
   // Refresh session — do not remove
   const { data: { user } } = await supabase.auth.getUser()
-
-  const { pathname } = request.nextUrl
 
   // Public routes that don't require auth
   const publicPaths = ['/login', '/auth/callback']
