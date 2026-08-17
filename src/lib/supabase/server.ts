@@ -2,32 +2,26 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
 export async function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || supabaseUrl.includes('your-project')) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set. Add it to your Vercel environment variables.')
-  }
-  if (!supabaseKey || supabaseKey.includes('your-anon')) {
-    throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY is not set. Add it to your Vercel environment variables.')
-  }
-
   const cookieStore = await cookies()
 
-  return createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {
+            // Called from Server Component — safe to ignore
+          }
+        },
       },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        } catch {
-          // Called from Server Component — safe to ignore
-        }
-      },
-    },
-  })
+    }
+  )
 }

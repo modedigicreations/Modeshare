@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { PenSquare } from 'lucide-react'
 import NewBriefForm from './NewBriefForm'
