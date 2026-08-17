@@ -1,4 +1,3 @@
-import { login, signup } from '@/app/auth/actions'
 import { Suspense } from 'react'
 import LoginForm from './LoginForm'
 
@@ -23,8 +22,8 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <Suspense>
-            <LoginForm loginAction={login} signupAction={signup} />
+          <Suspense fallback={<div className="h-64 animate-pulse bg-gray-100 rounded-xl" />}>
+            <LoginForm />
           </Suspense>
         </div>
 

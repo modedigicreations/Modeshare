@@ -1,20 +1,20 @@
 'use client'
 
-import { logout } from '@/app/auth/actions'
 import { Profile } from '@/types/database'
 import { ROLE_LABELS } from '@/lib/utils'
 import { LogOut, ChevronDown } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface Props {
   profile: Profile
 }
 
 export default function TopBar({ profile }: Props) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -24,6 +24,12 @@ export default function TopBar({ profile }: Props) {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+    router.refresh()
+  }
 
   const initials = profile.full_name
     ? profile.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -57,15 +63,13 @@ export default function TopBar({ profile }: Props) {
             <div className="px-3 py-2 border-b border-gray-100">
               <p className="text-xs text-gray-500 truncate">{profile.email}</p>
             </div>
-            <form action={logout}>
-              <button
-                type="submit"
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
-              >
-                <LogOut size={14} />
-                Sign out
-              </button>
-            </form>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition"
+            >
+              <LogOut size={14} />
+              Sign out
+            </button>
           </div>
         )}
       </div>
