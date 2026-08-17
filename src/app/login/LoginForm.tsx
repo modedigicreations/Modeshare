@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 
 interface Props {
@@ -15,18 +15,18 @@ export default function LoginForm({ loginAction, signupAction }: Props) {
 
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [showPassword, setShowPassword] = useState(false)
-  const [pending, setPending] = useState(false)
+  const [isPending, startTransition] = useTransition()
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    setPending(true)
     const formData = new FormData(e.currentTarget)
-    if (mode === 'login') {
-      await loginAction(formData)
-    } else {
-      await signupAction(formData)
-    }
-    setPending(false)
+    startTransition(async () => {
+      if (mode === 'login') {
+        await loginAction(formData)
+      } else {
+        await signupAction(formData)
+      }
+    })
   }
 
   return (
@@ -108,10 +108,10 @@ export default function LoginForm({ loginAction, signupAction }: Props) {
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={isPending}
         className="w-full bg-ms-red hover:bg-ms-red-dark text-white font-semibold py-2.5 rounded-lg text-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
       >
-        {pending && <Loader2 size={16} className="animate-spin" />}
+        {isPending && <Loader2 size={16} className="animate-spin" />}
         {mode === 'login' ? 'Sign in' : 'Create account'}
       </button>
 
