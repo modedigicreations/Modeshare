@@ -45,15 +45,19 @@ export async function updateSession(request: NextRequest) {
       // Not authenticated — redirect to login
       const url = request.nextUrl.clone()
       url.pathname = '/login'
+      if (error) {
+        url.searchParams.set('error', `Session error: ${error.message}`)
+      }
       return NextResponse.redirect(url)
     }
 
     return supabaseResponse
 
-  } catch {
-    // On any error, redirect to login rather than crashing
+  } catch (err) {
+    // On any error, redirect to login with error details rather than crashing silently
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.searchParams.set('error', `Middleware crash: ${err instanceof Error ? err.message : String(err)}`)
     return NextResponse.redirect(url)
   }
 }

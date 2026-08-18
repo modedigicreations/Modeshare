@@ -1,9 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 
 export default function LoginForm() {
+  const searchParams = useSearchParams()
+  const urlError = searchParams.get('error')
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -74,9 +77,9 @@ export default function LoginForm() {
         </p>
       </div>
 
-      {error && (
+      {(error || urlError) && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-          {error}
+          {error || urlError}
         </div>
       )}
 
