@@ -4,6 +4,7 @@ import { Profile } from '@/types/database'
 import { ROLE_LABELS } from '@/lib/utils'
 import { LogOut, ChevronDown } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { logoutAction } from '@/app/auth/actions'
 
 interface Props {
   profile: Profile
@@ -24,7 +25,7 @@ export default function TopBar({ profile }: Props) {
   }, [])
 
   async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await logoutAction()
     window.location.replace(new URL('/login', window.location.origin).toString())
   }
 

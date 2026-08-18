@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { loginAction, signupAction } from '@/app/auth/actions'
 
 export default function LoginForm() {
   const searchParams = useSearchParams()
@@ -18,35 +19,22 @@ export default function LoginForm() {
     setLoading(true)
 
     const form = new FormData(e.currentTarget)
-    const email = (form.get('email') as string).trim()
-    const password = form.get('password') as string
-    const full_name = (form.get('full_name') as string)?.trim() || ''
 
     try {
       if (mode === 'signup') {
-        const res = await fetch('/api/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, full_name }),
-        })
-        const json = await res.json()
-        if (!res.ok) {
-          setError(json.error || 'Signup failed')
+        const res = await signupAction(form)
+        if (!res.success) {
+          setError(res.error || 'Signup failed')
           return
         }
-        if (json.error) {
-          setError(json.error)
+        if (res.requiresConfirmation) {
+          setError('Almost there! Check your email to confirm your account, then sign in.')
           return
         }
       } else {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        })
-        const json = await res.json()
-        if (!res.ok) {
-          setError(json.error || 'Login failed')
+        const res = await loginAction(form)
+        if (!res.success) {
+          setError(res.error || 'Login failed')
           return
         }
       }

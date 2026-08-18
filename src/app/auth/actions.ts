@@ -1,11 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { isRedirectError } from 'next/dist/client/components/redirect-error'
 
-export async function login(formData: FormData) {
+export async function loginAction(formData: FormData) {
   try {
     const supabase = await createClient()
 
@@ -13,29 +11,27 @@ export async function login(formData: FormData) {
     const password = formData.get('password') as string
 
     if (!email || !password) {
-      redirect('/login?error=' + encodeURIComponent('Email and password are required.'))
+      return { success: false, error: 'Email and password are required.' }
     }
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      redirect('/login?error=' + encodeURIComponent(error.message))
+      return { success: false, error: error.message }
     }
 
     revalidatePath('/', 'layout')
-    redirect('/dashboard')
+    return { success: true }
   } catch (err) {
-    if (isRedirectError(err)) throw err
     console.error('Login error:', err)
-    const msg = err instanceof Error ? err.message : 'Login failed. Please try again.'
-    redirect('/login?error=' + encodeURIComponent(msg))
+    return { success: false, error: err instanceof Error ? err.message : 'Login failed. Please try again.' }
   }
 }
 
-export async function signup(formData: FormData) {
+export async function signupAction(formData: FormData) {
   try {
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('your-project')) {
-      redirect('/login?error=' + encodeURIComponent('Supabase is not configured. Please set environment variables in Vercel.'))
+      return { success: false, error: 'Supabase is not configured. Please set environment variables.' }
     }
 
     const supabase = await createClient()
@@ -45,7 +41,7 @@ export async function signup(formData: FormData) {
     const full_name = (formData.get('full_name') as string)?.trim()
 
     if (!email || !password) {
-      redirect('/login?error=' + encodeURIComponent('Email and password are required.'))
+      return { success: false, error: 'Email and password are required.' }
     }
 
     const { data, error } = await supabase.auth.signUp({
@@ -57,31 +53,30 @@ export async function signup(formData: FormData) {
     })
 
     if (error) {
-      redirect('/login?error=' + encodeURIComponent(error.message))
+      return { success: false, error: error.message }
     }
 
     // Email confirmation required (common Supabase default)
     if (data?.user && !data.session) {
-      redirect('/login?error=' + encodeURIComponent('Almost there! Check your email to confirm your account, then sign in.'))
+      return { success: true, requiresConfirmation: true }
     }
 
     revalidatePath('/', 'layout')
-    redirect('/dashboard')
+    return { success: true }
   } catch (err) {
-    if (isRedirectError(err)) throw err
     console.error('Signup error:', err)
-    const msg = err instanceof Error ? err.message : 'Signup failed. Please try again.'
-    redirect('/login?error=' + encodeURIComponent(msg))
+    return { success: false, error: err instanceof Error ? err.message : 'Signup failed. Please try again.' }
   }
 }
 
-export async function logout() {
+export async function logoutAction() {
   try {
     const supabase = await createClient()
     await supabase.auth.signOut()
-  } catch {
-    // ignore
+    revalidatePath('/', 'layout')
+    return { success: true }
+  } catch (err) {
+    console.error('Logout error:', err)
+    return { success: true }
   }
-  revalidatePath('/', 'layout')
-  redirect('/login')
 }
