@@ -5,6 +5,7 @@ import { ROLE_LABELS } from '@/lib/utils'
 import { LogOut, ChevronDown } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   profile: Profile
@@ -26,7 +27,8 @@ export default function TopBar({ profile }: Props) {
   }, [])
 
   async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    const supabase = createClient()
+    await supabase.auth.signOut()
     router.push('/login')
     router.refresh()
   }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginForm() {
   const router = useRouter()
@@ -17,30 +18,48 @@ export default function LoginForm() {
     setLoading(true)
 
     const form = new FormData(e.currentTarget)
-    const email = form.get('email') as string
+    const email = (form.get('email') as string).trim()
     const password = form.get('password') as string
-    const full_name = form.get('full_name') as string
+    const full_name = (form.get('full_name') as string)?.trim() || ''
 
     try {
-      const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/signup'
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name }),
-      })
+      const supabase = createClient()
 
-      const json = await res.json()
+      if (mode === 'signup') {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name } },
+        })
 
-      if (json.error) {
-        setError(json.error)
-        return
+        if (signUpError) {
+          setError(signUpError.message)
+          return
+        }
+
+        // Email confirmation required
+        if (data?.user && !data.session) {
+          setError('Check your email to confirm your account, then sign in.')
+          return
+        }
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        })
+
+        if (signInError) {
+          setError(signInError.message)
+          return
+        }
       }
 
-      // Success — redirect to dashboard
+      // Session is now stored in browser cookies — navigate to dashboard
       router.push('/dashboard')
       router.refresh()
+
     } catch (err) {
-      setError('Network error — please check your connection and try again.')
+      setError('Something went wrong. Please try again.')
       console.error(err)
     } finally {
       setLoading(false)
