@@ -4,15 +4,12 @@ import { Profile } from '@/types/database'
 import { ROLE_LABELS } from '@/lib/utils'
 import { LogOut, ChevronDown } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 
 interface Props {
   profile: Profile
 }
 
 export default function TopBar({ profile }: Props) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -27,10 +24,8 @@ export default function TopBar({ profile }: Props) {
   }, [])
 
   async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    await fetch('/api/auth/logout', { method: 'POST' })
+    window.location.replace(new URL('/login', window.location.origin).toString())
   }
 
   const initials = profile.full_name

@@ -1,12 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 
 export default function LoginForm() {
-  const router = useRouter()
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -23,40 +20,38 @@ export default function LoginForm() {
     const full_name = (form.get('full_name') as string)?.trim() || ''
 
     try {
-      const supabase = createClient()
-
       if (mode === 'signup') {
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name } },
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, full_name }),
         })
-
-        if (signUpError) {
-          setError(signUpError.message)
+        const json = await res.json()
+        if (!res.ok) {
+          setError(json.error || 'Signup failed')
           return
         }
-
-        // Email confirmation required
-        if (data?.user && !data.session) {
-          setError('Check your email to confirm your account, then sign in.')
+        if (json.error) {
+          setError(json.error)
           return
         }
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
         })
-
-        if (signInError) {
-          setError(signInError.message)
+        const json = await res.json()
+        if (!res.ok) {
+          setError(json.error || 'Login failed')
           return
         }
       }
 
-      // Session is now stored in browser cookies — trigger refresh and push
-      router.refresh()
-      router.push('/dashboard')
+      // Session cookies are set in the response headers.
+      // Use absolute URL redirect to avoid Next.js relative url linter warning
+      // and do a hard reload to ensure the middleware/server gets the new cookies.
+      window.location.replace(new URL('/dashboard', window.location.origin).toString())
 
     } catch (err) {
       setError('Something went wrong. Please try again.')
