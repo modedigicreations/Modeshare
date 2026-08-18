@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ClipboardCheck } from 'lucide-react'
-import { Post, Profile } from '@/types/database'
+import { Post } from '@/types/database'
 import ApprovalsClient from './ApprovalsClient'
 
 export const metadata = { title: 'Approvals — Modeshare' }
@@ -53,7 +53,6 @@ export default async function ApprovalsPage() {
 
       <ApprovalsClient
         initialPosts={(posts as (Post & { brief: { topic: string; tone: string; target_date: string | null; platforms: string[] }; profile: { full_name: string | null; email: string } })[]) || []}
-        reviewerId={user.id}
       />
     </div>
   )

@@ -19,7 +19,6 @@ import {
 import { Platform, BriefStatus, PostStatus } from '@/types/database'
 import {
   PenSquare,
-  ClipboardCheck,
   Send,
   CheckCircle2,
   Clock,

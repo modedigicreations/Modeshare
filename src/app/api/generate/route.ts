@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generatePosts } from '@/lib/deepseek'
-import { Platform, Tone } from '@/types/database'
+import { Platform } from '@/types/database'
 import { z } from 'zod'
 
 const schema = z.object({
@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
     try {
       variants = await generatePosts({ topic, description, tone, platforms: platforms as Platform[] })
     } catch (err) {
-      // Mark brief as failed and return
+      // Delete the brief since generation failed
       await supabase
         .from('briefs')
-        .update({ status: 'generated' })
+        .delete()
         .eq('id', brief.id)
 
       return NextResponse.json(

@@ -46,23 +46,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch Buffer connection — use the post author's connection if approver doesn't have one
-    const { data: bufferConn } = await supabase
+    let { data: bufferConn } = await supabase
       .from('buffer_connections')
       .select('*')
       .eq('user_id', user.id)
       .single()
 
-    if (!bufferConn) {
-      return NextResponse.json(
-        { error: 'No Buffer account connected. Go to Settings to connect Buffer.' },
-        { status: 400 }
-      )
-    }
-
     const platform = post.platform as Platform
-    const profileId = (bufferConn.profile_ids as Record<string, string>)[platform]
+    let profileId = bufferConn
+      ? (bufferConn.profile_ids as Record<string, string>)[platform]
+      : undefined
 
     if (!profileId) {
+      const { data: authorConn } = await supabase
+        .from('buffer_connections')
+        .select('*')
+        .eq('user_id', post.user_id)
+        .single()
+      if (authorConn) {
+        bufferConn = authorConn
+        profileId = (authorConn.profile_ids as Record<string, string>)[platform]
+      }
+    }
+
+    if (!bufferConn || !profileId) {
       return NextResponse.json(
         { error: `No Buffer profile connected for ${platform}. Check your Settings.` },
         { status: 400 }

@@ -33,7 +33,6 @@ type EnrichedPost = Post & {
 
 interface Props {
   initialPosts: EnrichedPost[]
-  reviewerId: string
 }
 
 function PlatformDot({ platform }: { platform: Platform }) {
@@ -57,8 +56,8 @@ type PostState = {
   scheduled_at?: string | null
 }
 
-export default function ApprovalsClient({ initialPosts, reviewerId: _reviewerId }: Props) {
-  const [posts, setPosts] = useState<EnrichedPost[]>(initialPosts)
+export default function ApprovalsClient({ initialPosts }: Props) {
+  const [posts] = useState<EnrichedPost[]>(initialPosts)
   const [postStates, setPostStates] = useState<Record<string, PostState>>(() =>
     Object.fromEntries(
       initialPosts.map((p) => [

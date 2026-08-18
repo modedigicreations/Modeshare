@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { Post, Platform, PostStatus } from '@/types/database'
+import { Post } from '@/types/database'
 import CalendarClient from './CalendarClient'
 
 export const metadata = { title: 'Calendar — Modeshare' }
