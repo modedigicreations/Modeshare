@@ -14,19 +14,24 @@ export default async function DashboardLayout({
 
   const {
     data: { user },
+    error: authError
   } = await supabase.auth.getUser()
 
-  if (!user) redirect('/login')
+  if (!user) {
+    redirect('/login?error=' + encodeURIComponent(`Auth error in DashboardLayout: ${authError?.message || 'No user session'}`))
+  }
 
-  let { data: profile } = await supabase
+  const { data: initialProfile, error: profileError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
+  let profile = initialProfile
+
   // Profile may not exist yet if the DB trigger hasn't fired — create it inline
   if (!profile) {
-    const { data: newProfile } = await supabase
+    const { data: newProfile, error: insertError } = await supabase
       .from('profiles')
       .insert({
         id: user.id,
@@ -37,11 +42,17 @@ export default async function DashboardLayout({
       .select()
       .single()
 
+    if (insertError) {
+      redirect('/login?error=' + encodeURIComponent(`Profile inline insert failed: ${insertError.message}. Fetch error: ${profileError?.message || 'None'}`))
+    }
+
     profile = newProfile
   }
 
   // If still no profile something is structurally wrong — redirect cleanly
-  if (!profile) redirect('/login')
+  if (!profile) {
+    redirect('/login?error=' + encodeURIComponent(`No profile found for user ${user.email} after insert attempt`))
+  }
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
