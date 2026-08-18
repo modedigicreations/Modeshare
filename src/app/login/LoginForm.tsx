@@ -1,12 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginForm() {
-  const router = useRouter()
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -54,9 +52,9 @@ export default function LoginForm() {
         }
       }
 
-      // Session is now stored in browser cookies — navigate to dashboard
-      router.push('/dashboard')
-      router.refresh()
+      // Session is now stored in browser cookies — do a hard redirect so
+      // the server re-reads the session from cookies properly
+      window.location.href = '/dashboard'
 
     } catch (err) {
       setError('Something went wrong. Please try again.')

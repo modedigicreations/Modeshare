@@ -4,15 +4,16 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Never intercept API routes, static files, or auth paths
+  // Never intercept these paths
   const bypass = ['/api/', '/_next/', '/favicon', '/login', '/auth/']
   if (bypass.some((p) => pathname.startsWith(p))) {
     return NextResponse.next({ request })
   }
 
-  // If env vars are missing, let the request through — the page will handle auth
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  // If env vars missing, let the page handle it
   if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('your-project')) {
     return NextResponse.next({ request })
   }
@@ -37,19 +38,22 @@ export async function updateSession(request: NextRequest) {
       },
     })
 
-    const { data: { user } } = await supabase.auth.getUser()
+    // Refresh and verify session
+    const { data: { user }, error } = await supabase.auth.getUser()
 
-    // Redirect unauthenticated users to login
-    if (!user) {
+    if (error || !user) {
+      // Not authenticated — redirect to login
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
     }
 
-  } catch {
-    // If anything goes wrong, allow the request rather than redirect-looping
-    return NextResponse.next({ request })
-  }
+    return supabaseResponse
 
-  return supabaseResponse
+  } catch {
+    // On any error, redirect to login rather than crashing
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
+  }
 }
