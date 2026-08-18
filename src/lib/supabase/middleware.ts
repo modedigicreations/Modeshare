@@ -4,17 +4,23 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // API routes handle their own auth — never redirect them
-  if (pathname.startsWith('/api/')) {
+  // Never intercept API routes, static files, or auth paths
+  const bypass = ['/api/', '/_next/', '/favicon', '/login', '/auth/']
+  if (bypass.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next({ request })
+  }
+
+  // If env vars are missing, let the request through — the page will handle auth
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseKey || supabaseUrl.includes('your-project')) {
     return NextResponse.next({ request })
   }
 
   let supabaseResponse = NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  try {
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -29,26 +35,20 @@ export async function updateSession(request: NextRequest) {
           )
         },
       },
+    })
+
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Redirect unauthenticated users to login
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
     }
-  )
 
-  // Refresh session — do not remove
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Public routes that don't require auth
-  const publicPaths = ['/login', '/auth/callback']
-  const isPublic = publicPaths.some((p) => pathname.startsWith(p))
-
-  if (!user && !isPublic) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
-  }
-
-  if (user && pathname === '/login') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  } catch {
+    // If anything goes wrong, allow the request rather than redirect-looping
+    return NextResponse.next({ request })
   }
 
   return supabaseResponse
