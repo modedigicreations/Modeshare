@@ -21,10 +21,13 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   try {
+    const allCookies = request.cookies.getAll()
+    const cookieNames = allCookies.map(c => c.name).join(', ')
+
     const supabase = createServerClient(supabaseUrl, supabaseKey, {
       cookies: {
         getAll() {
-          return request.cookies.getAll()
+          return allCookies
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
@@ -46,7 +49,9 @@ export async function updateSession(request: NextRequest) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       if (error) {
-        url.searchParams.set('error', `Session error: ${error.message}`)
+        url.searchParams.set('error', `Session error: ${error.message}. Cookies: [${cookieNames}]`)
+      } else {
+        url.searchParams.set('error', `No active user session. Cookies: [${cookieNames}]`)
       }
       return NextResponse.redirect(url)
     }
