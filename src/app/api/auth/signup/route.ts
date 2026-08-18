@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,7 +10,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const cookieStore = await cookies()
+    const response = NextResponse.json({ success: true })
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+              response.cookies.set(name, value, options)
+            })
+          },
+        },
+      }
+    )
 
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -29,7 +49,7 @@ export async function POST(request: NextRequest) {
       }, { status: 200 })
     }
 
-    return NextResponse.json({ success: true })
+    return response
   } catch (err) {
     console.error('Signup error:', err)
     const message = err instanceof Error ? err.message : 'Signup failed'
