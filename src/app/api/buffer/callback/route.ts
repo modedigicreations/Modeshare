@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const error = searchParams.get('error')
+  const stateParam = searchParams.get('state')
 
   if (error || !code) {
     return NextResponse.redirect(`${origin}/dashboard/settings?error=buffer_auth_failed`)
@@ -18,20 +19,27 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.redirect(`${origin}/login`)
 
-    // Retrieve code verifier from cookies
+    // Retrieve verifier and state from cookies
     const cookieStore = await cookies()
     const codeVerifier = cookieStore.get('buffer_code_verifier')?.value
+    const savedState = cookieStore.get('buffer_oauth_state')?.value
+
+    // Clean up authentication cookies
+    cookieStore.delete('buffer_code_verifier')
+    cookieStore.delete('buffer_oauth_state')
 
     if (!codeVerifier) {
       console.error('Missing buffer_code_verifier cookie')
       return NextResponse.redirect(`${origin}/dashboard/settings?error=buffer_auth_failed`)
     }
 
+    if (!savedState || savedState !== stateParam) {
+      console.error('Buffer OAuth state mismatch')
+      return NextResponse.redirect(`${origin}/dashboard/settings?error=buffer_auth_failed`)
+    }
+
     // Exchange code for access token
     const accessToken = await exchangeBufferCode(code, codeVerifier)
-
-    // Clear the verifier cookie
-    cookieStore.delete('buffer_code_verifier')
 
     // Fetch connected profiles and map to our platforms
     const profiles = await getBufferProfiles(accessToken)

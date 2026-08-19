@@ -114,7 +114,7 @@ export function generatePkce() {
 /**
  * Build the Buffer OAuth authorization URL with PKCE challenge
  */
-export function getBufferAuthUrl(challenge: string): string {
+export function getBufferAuthUrl(challenge: string, state: string): string {
   const params = new URLSearchParams({
     client_id: (process.env.BUFFER_CLIENT_ID || '').trim(),
     redirect_uri: (process.env.BUFFER_REDIRECT_URI || '').trim(),
@@ -122,6 +122,7 @@ export function getBufferAuthUrl(challenge: string): string {
     code_challenge: challenge,
     code_challenge_method: 'S256',
     scope: 'account:read posts:read posts:write',
+    state: state,
   })
   return `https://auth.buffer.com/auth?${params}`
 }
