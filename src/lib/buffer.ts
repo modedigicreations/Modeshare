@@ -121,7 +121,8 @@ export async function scheduleBufferPost(
   accessToken: string,
   profileId: string,
   content: string,
-  scheduledAt?: string | null
+  scheduledAt?: string | null,
+  platform?: string
 ): Promise<string> {
   const mutation = `
     mutation CreateBufferPost($input: CreatePostInput!) {
@@ -138,7 +139,7 @@ export async function scheduleBufferPost(
     }
   `
 
-  const input: Record<string, string> = {
+  const input: Record<string, unknown> = {
     text: content,
     channelId: profileId,
     schedulingType: 'automatic',
@@ -149,6 +150,20 @@ export async function scheduleBufferPost(
     input.dueAt = new Date(scheduledAt).toISOString()
   } else {
     input.mode = 'addToQueue'
+  }
+
+  if (platform === 'facebook') {
+    input.metadata = {
+      facebook: {
+        type: 'post',
+      },
+    }
+  } else if (platform === 'instagram') {
+    input.metadata = {
+      instagram: {
+        type: 'post',
+      },
+    }
   }
 
   const res = await fetch('https://api.buffer.com', {

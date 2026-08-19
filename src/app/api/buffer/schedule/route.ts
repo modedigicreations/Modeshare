@@ -81,7 +81,8 @@ export async function POST(request: NextRequest) {
       bufferConn.access_token,
       profileId,
       post.content,
-      post.scheduled_at
+      post.scheduled_at,
+      platform
     )
 
     // Update post status
