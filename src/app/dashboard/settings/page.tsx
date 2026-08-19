@@ -6,6 +6,7 @@ import { getBufferAuthUrl } from '@/lib/buffer'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Settings, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
 import BufferConnectButton from './BufferConnectButton'
+import RoleSwitcher from './RoleSwitcher'
 
 export const metadata = { title: 'Settings — Modeshare' }
 
@@ -89,9 +90,7 @@ export default async function SettingsPage({ searchParams }: Props) {
           </div>
           <div className="flex items-center justify-between py-2">
             <span className="text-sm text-gray-500">Role</span>
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-ms-blue/10 text-ms-blue capitalize">
-              {profile?.role}
-            </span>
+            <RoleSwitcher currentRole={profile?.role || 'creator'} />
           </div>
         </CardBody>
       </Card>
@@ -139,7 +138,13 @@ export default async function SettingsPage({ searchParams }: Props) {
                 )}
               </div>
               <div className="pt-2 border-t border-gray-100">
-                <BufferConnectButton href={bufferAuthUrl} reconnect />
+                {!process.env.BUFFER_CLIENT_ID || !process.env.BUFFER_REDIRECT_URI ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+                    Buffer configuration is missing. Reconnection disabled.
+                  </div>
+                ) : (
+                  <BufferConnectButton href={bufferAuthUrl} reconnect />
+                )}
               </div>
             </>
           ) : (
@@ -160,7 +165,20 @@ export default async function SettingsPage({ searchParams }: Props) {
                 </a>{' '}
                 with your social profiles connected before linking here.
               </div>
-              <BufferConnectButton href={bufferAuthUrl} />
+              {!process.env.BUFFER_CLIENT_ID || !process.env.BUFFER_REDIRECT_URI ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-700 space-y-1">
+                  <p className="font-semibold">Buffer Configuration Missing:</p>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {!process.env.BUFFER_CLIENT_ID && <li>`BUFFER_CLIENT_ID` is not set</li>}
+                    {!process.env.BUFFER_REDIRECT_URI && <li>`BUFFER_REDIRECT_URI` is not set</li>}
+                  </ul>
+                  <p className="mt-1 text-[10px] text-red-500">
+                    Configure these variables in your `.env.local` or Railway settings to enable Buffer connection.
+                  </p>
+                </div>
+              ) : (
+                <BufferConnectButton href={bufferAuthUrl} />
+              )}
             </div>
           )}
         </CardBody>

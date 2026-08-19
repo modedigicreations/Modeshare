@@ -80,3 +80,26 @@ export async function logoutAction() {
     return { success: true }
   }
 }
+
+import { UserRole } from '@/types/database'
+
+export async function updateRoleAction(role: UserRole) {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Not authenticated' }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role })
+      .eq('id', user.id)
+
+    if (error) return { success: false, error: error.message }
+
+    revalidatePath('/', 'layout')
+    return { success: true }
+  } catch (err) {
+    console.error('Update role error:', err)
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to update role' }
+  }
+}
