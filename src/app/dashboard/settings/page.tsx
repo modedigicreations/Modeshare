@@ -16,7 +16,7 @@ interface Props {
 export default async function SettingsPage({ searchParams }: Props) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/login?error=' + encodeURIComponent('No user session in SettingsPage'))
 
   const { data: profile } = await supabase
     .from('profiles')

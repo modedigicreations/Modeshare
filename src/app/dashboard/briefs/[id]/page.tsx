@@ -42,7 +42,7 @@ export default async function BriefDetailPage({ params }: Props) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/login?error=' + encodeURIComponent('No user session in BriefDetailPage'))
 
   const { data: profile } = await supabase
     .from('profiles')

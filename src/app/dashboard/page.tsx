@@ -32,7 +32,7 @@ export const metadata = { title: 'Dashboard — Modeshare' }
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/login?error=' + encodeURIComponent('No user session in DashboardPage'))
 
   const { data: profile } = await supabase
     .from('profiles')

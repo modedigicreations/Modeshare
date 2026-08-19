@@ -10,7 +10,7 @@ export const metadata = { title: 'Calendar — Modeshare' }
 export default async function CalendarPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  if (!user) redirect('/login?error=' + encodeURIComponent('No user session in CalendarPage'))
 
   const { data: profile } = await supabase
     .from('profiles')
