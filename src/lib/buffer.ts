@@ -100,20 +100,37 @@ export async function scheduleBufferPost(
 /**
  * Build the Buffer OAuth authorization URL
  */
-export function getBufferAuthUrl(): string {
+import crypto from 'crypto'
+
+export function generatePkce() {
+  const verifier = crypto.randomBytes(32).toString('base64url')
+  const challenge = crypto
+    .createHash('sha256')
+    .update(verifier)
+    .digest('base64url')
+  return { verifier, challenge }
+}
+
+/**
+ * Build the Buffer OAuth authorization URL with PKCE challenge
+ */
+export function getBufferAuthUrl(challenge: string): string {
   const params = new URLSearchParams({
     client_id: (process.env.BUFFER_CLIENT_ID || '').trim(),
     redirect_uri: (process.env.BUFFER_REDIRECT_URI || '').trim(),
     response_type: 'code',
+    code_challenge: challenge,
+    code_challenge_method: 'S256',
+    scope: 'account:read posts:read posts:write',
   })
-  return `https://bufferapp.com/oauth2/authorize?${params}`
+  return `https://auth.buffer.com/auth?${params}`
 }
 
 /**
- * Exchange authorization code for access token
+ * Exchange authorization code for access token using code verifier
  */
-export async function exchangeBufferCode(code: string): Promise<string> {
-  const res = await fetch('https://api.bufferapp.com/1/oauth2/token.json', {
+export async function exchangeBufferCode(code: string, codeVerifier: string): Promise<string> {
+  const res = await fetch('https://auth.buffer.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -121,6 +138,7 @@ export async function exchangeBufferCode(code: string): Promise<string> {
       client_secret: (process.env.BUFFER_CLIENT_SECRET || '').trim(),
       redirect_uri: (process.env.BUFFER_REDIRECT_URI || '').trim(),
       code,
+      code_verifier: codeVerifier,
       grant_type: 'authorization_code',
     }),
   })

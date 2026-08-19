@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { getBufferAuthUrl } from '@/lib/buffer'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Settings, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
 import BufferConnectButton from './BufferConnectButton'
@@ -32,7 +31,7 @@ export default async function SettingsPage({ searchParams }: Props) {
     .single()
 
   const params = await searchParams
-  const bufferAuthUrl = getBufferAuthUrl()
+  const bufferAuthUrl = '/api/buffer/connect'
 
   const connectedPlatforms = bufferConn
     ? Object.keys(bufferConn.profile_ids as Record<string, string>)

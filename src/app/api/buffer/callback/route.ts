@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { exchangeBufferCode, getBufferProfiles, findProfileId } from '@/lib/buffer'
 import { Platform } from '@/types/database'
@@ -17,8 +18,20 @@ export async function GET(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.redirect(`${origin}/login`)
 
+    // Retrieve code verifier from cookies
+    const cookieStore = await cookies()
+    const codeVerifier = cookieStore.get('buffer_code_verifier')?.value
+
+    if (!codeVerifier) {
+      console.error('Missing buffer_code_verifier cookie')
+      return NextResponse.redirect(`${origin}/dashboard/settings?error=buffer_auth_failed`)
+    }
+
     // Exchange code for access token
-    const accessToken = await exchangeBufferCode(code)
+    const accessToken = await exchangeBufferCode(code, codeVerifier)
+
+    // Clear the verifier cookie
+    cookieStore.delete('buffer_code_verifier')
 
     // Fetch connected profiles and map to our platforms
     const profiles = await getBufferProfiles(accessToken)
