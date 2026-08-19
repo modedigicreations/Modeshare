@@ -127,6 +127,20 @@ ALTER TABLE public.briefs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.buffer_connections ENABLE ROW LEVEL SECURITY;
 
+-- SECURITY DEFINER Helper to check roles without infinite RLS recursion
+CREATE OR REPLACE FUNCTION public.is_admin_or_approver()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('approver', 'admin')
+  );
+END;
+$$;
+
 -- Profiles: users see their own, admins/approvers see all
 DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
 CREATE POLICY "profiles_select_own" ON public.profiles
@@ -134,12 +148,7 @@ CREATE POLICY "profiles_select_own" ON public.profiles
 
 DROP POLICY IF EXISTS "profiles_select_team" ON public.profiles;
 CREATE POLICY "profiles_select_team" ON public.profiles
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role IN ('approver', 'admin')
-    )
-  );
+  FOR SELECT USING ( public.is_admin_or_approver() );
 
 DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 CREATE POLICY "profiles_update_own" ON public.profiles
@@ -152,12 +161,7 @@ CREATE POLICY "briefs_select_own" ON public.briefs
 
 DROP POLICY IF EXISTS "briefs_select_approver" ON public.briefs;
 CREATE POLICY "briefs_select_approver" ON public.briefs
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role IN ('approver', 'admin')
-    )
-  );
+  FOR SELECT USING ( public.is_admin_or_approver() );
 
 DROP POLICY IF EXISTS "briefs_insert_own" ON public.briefs;
 CREATE POLICY "briefs_insert_own" ON public.briefs
@@ -169,12 +173,7 @@ CREATE POLICY "briefs_update_own" ON public.briefs
 
 DROP POLICY IF EXISTS "briefs_update_approver" ON public.briefs;
 CREATE POLICY "briefs_update_approver" ON public.briefs
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role IN ('approver', 'admin')
-    )
-  );
+  FOR UPDATE USING ( public.is_admin_or_approver() );
 
 -- Posts: same pattern as briefs
 DROP POLICY IF EXISTS "posts_select_own" ON public.posts;
@@ -183,12 +182,7 @@ CREATE POLICY "posts_select_own" ON public.posts
 
 DROP POLICY IF EXISTS "posts_select_approver" ON public.posts;
 CREATE POLICY "posts_select_approver" ON public.posts
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role IN ('approver', 'admin')
-    )
-  );
+  FOR SELECT USING ( public.is_admin_or_approver() );
 
 DROP POLICY IF EXISTS "posts_insert_own" ON public.posts;
 CREATE POLICY "posts_insert_own" ON public.posts
@@ -200,12 +194,7 @@ CREATE POLICY "posts_update_own" ON public.posts
 
 DROP POLICY IF EXISTS "posts_update_approver" ON public.posts;
 CREATE POLICY "posts_update_approver" ON public.posts
-  FOR UPDATE USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = auth.uid() AND p.role IN ('approver', 'admin')
-    )
-  );
+  FOR UPDATE USING ( public.is_admin_or_approver() );
 
 -- Buffer connections: only owner
 DROP POLICY IF EXISTS "buffer_select_own" ON public.buffer_connections;
