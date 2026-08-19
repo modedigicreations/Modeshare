@@ -10,7 +10,7 @@ import RoleSwitcher from './RoleSwitcher'
 export const metadata = { title: 'Settings — Modeshare' }
 
 interface Props {
-  searchParams: Promise<{ success?: string; error?: string }>
+  searchParams: Promise<{ success?: string; error?: string; details?: string }>
 }
 
 export default async function SettingsPage({ searchParams }: Props) {
@@ -63,13 +63,22 @@ export default async function SettingsPage({ searchParams }: Props) {
         </div>
       )}
       {params.error && (
-        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
-          <AlertCircle size={16} />
-          {params.error === 'buffer_auth_failed'
-            ? 'Buffer authorization failed. Please try again.'
-            : params.error === 'buffer_callback_failed'
-              ? 'Could not complete Buffer connection. Check your credentials.'
-              : params.error}
+        <div className="space-y-1 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={16} className="shrink-0" />
+            <span>
+              {params.error === 'buffer_auth_failed'
+                ? 'Buffer authorization failed. Please try again.'
+                : params.error === 'buffer_callback_failed'
+                  ? 'Could not complete Buffer connection. Check your credentials.'
+                  : params.error}
+            </span>
+          </div>
+          {params.details && (
+            <div className="text-xs text-red-600 font-mono pl-6 mt-1.5 pt-1.5 border-t border-red-100">
+              Details: {params.details}
+            </div>
+          )}
         </div>
       )}
 

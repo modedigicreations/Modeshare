@@ -4,14 +4,26 @@ import { createClient } from '@/lib/supabase/server'
 import { exchangeBufferCode, getBufferProfiles, findProfileId } from '@/lib/buffer'
 import { Platform } from '@/types/database'
 
+function getRequestOrigin(request: NextRequest): string {
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
+  const proto = request.headers.get('x-forwarded-proto') || 'https'
+  if (host) {
+    return `${proto}://${host}`
+  }
+  return new URL(request.url).origin
+}
+
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const origin = getRequestOrigin(request)
+  const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const error = searchParams.get('error')
   const stateParam = searchParams.get('state')
 
   if (error || !code) {
-    return NextResponse.redirect(`${origin}/dashboard/settings?error=buffer_auth_failed`)
+    return NextResponse.redirect(
+      `${origin}/dashboard/settings?error=buffer_auth_failed&details=${encodeURIComponent(error || 'No authorization code returned')}`
+    )
   }
 
   try {
@@ -30,12 +42,16 @@ export async function GET(request: NextRequest) {
 
     if (!codeVerifier) {
       console.error('Missing buffer_code_verifier cookie')
-      return NextResponse.redirect(`${origin}/dashboard/settings?error=buffer_auth_failed`)
+      return NextResponse.redirect(
+        `${origin}/dashboard/settings?error=buffer_auth_failed&details=Missing%20code%20verifier%20session%20cookie`
+      )
     }
 
     if (!savedState || savedState !== stateParam) {
       console.error('Buffer OAuth state mismatch')
-      return NextResponse.redirect(`${origin}/dashboard/settings?error=buffer_auth_failed`)
+      return NextResponse.redirect(
+        `${origin}/dashboard/settings?error=buffer_auth_failed&details=OAuth%20state%20mismatch%20(possible%20CSRF%20or%20session%20expiration)`
+      )
     }
 
     // Exchange code for access token
@@ -52,7 +68,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Upsert the buffer connection
-    await supabase.from('buffer_connections').upsert(
+    const { error: upsertError } = await supabase.from('buffer_connections').upsert(
       {
         user_id: user.id,
         access_token: accessToken,
@@ -62,9 +78,16 @@ export async function GET(request: NextRequest) {
       { onConflict: 'user_id' }
     )
 
+    if (upsertError) {
+      throw new Error(`Database upsert failed: ${upsertError.message}`)
+    }
+
     return NextResponse.redirect(`${origin}/dashboard/settings?success=buffer_connected`)
   } catch (err) {
     console.error('Buffer callback error:', err)
-    return NextResponse.redirect(`${origin}/dashboard/settings?error=buffer_callback_failed`)
+    const msg = err instanceof Error ? err.message : 'Unknown callback error'
+    return NextResponse.redirect(
+      `${origin}/dashboard/settings?error=buffer_callback_failed&details=${encodeURIComponent(msg)}`
+    )
   }
 }
