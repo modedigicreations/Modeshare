@@ -11,44 +11,75 @@ export interface BufferProfile {
  * Fetch all connected Buffer profiles for a given access token using GraphQL API
  */
 export async function getBufferProfiles(accessToken: string): Promise<BufferProfile[]> {
-  const query = `
-    query GetChannels {
-      account {
-        organizations {
-          channels {
-            id
-            name
-            service
-          }
-        }
-      }
-    }
-  `
-
-  const res = await fetch('https://api.buffer.com', {
+  // 1. Get organizations
+  const orgsRes = await fetch('https://api.buffer.com', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ query }),
+    body: JSON.stringify({
+      query: `
+        query GetOrganizations {
+          account {
+            organizations {
+              id
+            }
+          }
+        }
+      `
+    }),
   })
 
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Buffer GraphQL profiles fetch failed: ${err}`)
+  if (!orgsRes.ok) {
+    const err = await orgsRes.text()
+    throw new Error(`Buffer organizations fetch failed: ${err}`)
   }
 
-  const result = await res.json()
-  if (result.errors) {
-    throw new Error(`Buffer GraphQL error: ${result.errors[0]?.message || 'Unknown GraphQL error'}`)
+  const orgsResult = await orgsRes.json()
+  if (orgsResult.errors) {
+    throw new Error(`Buffer GraphQL organizations error: ${orgsResult.errors[0]?.message || 'Unknown GraphQL error'}`)
   }
 
+  const organizations = orgsResult.data?.account?.organizations || []
   const channels: BufferProfile[] = []
-  const organizations = result.data?.account?.organizations || []
 
+  // 2. Fetch channels for each organization
   for (const org of organizations) {
-    const orgChannels = org.channels || []
+    const orgId = org.id
+    if (!orgId) continue
+
+    const channelsRes = await fetch('https://api.buffer.com', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        query: `
+          query GetChannels {
+            channels(input: { organizationId: "${orgId}" }) {
+              id
+              name
+              service
+            }
+          }
+        `
+      }),
+    })
+
+    if (!channelsRes.ok) {
+      console.warn(`Failed to fetch channels for organization ${orgId}`)
+      continue
+    }
+
+    const channelsResult = await channelsRes.json()
+    if (channelsResult.errors) {
+      console.warn(`Buffer channels error for organization ${orgId}:`, channelsResult.errors)
+      continue
+    }
+
+    const orgChannels = channelsResult.data?.channels || []
     for (const ch of orgChannels) {
       channels.push({
         id: ch.id,
