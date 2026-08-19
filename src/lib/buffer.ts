@@ -102,8 +102,8 @@ export async function scheduleBufferPost(
  */
 export function getBufferAuthUrl(): string {
   const params = new URLSearchParams({
-    client_id: process.env.BUFFER_CLIENT_ID!,
-    redirect_uri: process.env.BUFFER_REDIRECT_URI!,
+    client_id: (process.env.BUFFER_CLIENT_ID || '').trim(),
+    redirect_uri: (process.env.BUFFER_REDIRECT_URI || '').trim(),
     response_type: 'code',
   })
   return `https://bufferapp.com/oauth2/authorize?${params}`
@@ -117,9 +117,9 @@ export async function exchangeBufferCode(code: string): Promise<string> {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: process.env.BUFFER_CLIENT_ID!,
-      client_secret: process.env.BUFFER_CLIENT_SECRET!,
-      redirect_uri: process.env.BUFFER_REDIRECT_URI!,
+      client_id: (process.env.BUFFER_CLIENT_ID || '').trim(),
+      client_secret: (process.env.BUFFER_CLIENT_SECRET || '').trim(),
+      redirect_uri: (process.env.BUFFER_REDIRECT_URI || '').trim(),
       code,
       grant_type: 'authorization_code',
     }),
