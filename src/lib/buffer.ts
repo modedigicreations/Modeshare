@@ -1,7 +1,5 @@
 import { Platform } from '@/types/database'
 
-const BUFFER_API = 'https://api.bufferapp.com/1'
-
 export interface BufferProfile {
   id: string
   service: string  // 'facebook' | 'twitter' | 'linkedin_page' etc
@@ -9,29 +7,59 @@ export interface BufferProfile {
   formatted_service: string
 }
 
-export interface BufferUpdateResponse {
-  success: boolean
-  buffer_count: number
-  buffer_percentage: number
-  updates: {
-    id: string
-    status: string
-    text: string
-    profile_id: string
-    scheduled_at?: number
-  }[]
-}
-
 /**
- * Fetch all connected Buffer profiles for a given access token
+ * Fetch all connected Buffer profiles for a given access token using GraphQL API
  */
 export async function getBufferProfiles(accessToken: string): Promise<BufferProfile[]> {
-  const res = await fetch(`${BUFFER_API}/profiles.json?access_token=${accessToken}`)
+  const query = `
+    query GetChannels {
+      account {
+        organizations {
+          channels {
+            id
+            name
+            service
+          }
+        }
+      }
+    }
+  `
+
+  const res = await fetch('https://api.buffer.com', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ query }),
+  })
+
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`Buffer profiles fetch failed: ${err}`)
+    throw new Error(`Buffer GraphQL profiles fetch failed: ${err}`)
   }
-  return res.json()
+
+  const result = await res.json()
+  if (result.errors) {
+    throw new Error(`Buffer GraphQL error: ${result.errors[0]?.message || 'Unknown GraphQL error'}`)
+  }
+
+  const channels: BufferProfile[] = []
+  const organizations = result.data?.account?.organizations || []
+
+  for (const org of organizations) {
+    const orgChannels = org.channels || []
+    for (const ch of orgChannels) {
+      channels.push({
+        id: ch.id,
+        service: ch.service,
+        service_username: ch.name || '',
+        formatted_service: ch.service,
+      })
+    }
+  }
+
+  return channels
 }
 
 /**
@@ -56,7 +84,7 @@ export function findProfileId(
 }
 
 /**
- * Schedule a post to Buffer
+ * Schedule a post to Buffer using GraphQL API
  */
 export async function scheduleBufferPost(
   accessToken: string,
@@ -64,37 +92,67 @@ export async function scheduleBufferPost(
   content: string,
   scheduledAt?: string | null
 ): Promise<string> {
-  const body = new URLSearchParams({
-    access_token: accessToken,
-    'profile_ids[]': profileId,
-    text: content,
-  })
+  const mutation = `
+    mutation CreateBufferPost($input: CreatePostInput!) {
+      createPost(input: $input) {
+        ... on PostActionSuccess {
+          post {
+            id
+          }
+        }
+        ... on MutationError {
+          message
+        }
+      }
+    }
+  `
 
-  if (scheduledAt) {
-    const timestamp = Math.floor(new Date(scheduledAt).getTime() / 1000)
-    body.append('scheduled_at', timestamp.toString())
-  } else {
-    // Add to the end of the queue
-    body.append('now', 'false')
+  const input: Record<string, string> = {
+    text: content,
+    channelId: profileId,
+    schedulingType: 'automatic',
   }
 
-  const res = await fetch(`${BUFFER_API}/updates/create.json`, {
+  if (scheduledAt) {
+    input.mode = 'customScheduled'
+    input.dueAt = new Date(scheduledAt).toISOString()
+  } else {
+    input.mode = 'addToQueue'
+  }
+
+  const res = await fetch('https://api.buffer.com', {
     method: 'POST',
-    body,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      query: mutation,
+      variables: { input },
+    }),
   })
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`Buffer schedule failed: ${err}`)
+    throw new Error(`Buffer GraphQL schedule failed: ${err}`)
   }
 
-  const data: BufferUpdateResponse = await res.json()
-
-  if (!data.success || !data.updates?.[0]?.id) {
-    throw new Error('Buffer returned no update ID')
+  const result = await res.json()
+  if (result.errors) {
+    throw new Error(`Buffer GraphQL error: ${result.errors[0]?.message || 'Unknown GraphQL error'}`)
   }
 
-  return data.updates[0].id
+  const createPostData = result.data?.createPost
+  if (createPostData?.message) {
+    throw new Error(`Buffer scheduling error: ${createPostData.message}`)
+  }
+
+  const postId = createPostData?.post?.id
+  if (!postId) {
+    throw new Error('Buffer returned no post ID')
+  }
+
+  return postId
 }
 
 /**
