@@ -8,8 +8,10 @@ export async function GET() {
     deepseek_key: !!process.env.DEEPSEEK_API_KEY,
     buffer_client_id: !!process.env.BUFFER_CLIENT_ID,
     buffer_client_secret: !!process.env.BUFFER_CLIENT_SECRET,
-    supabase_url_preview: process.env.NEXT_PUBLIC_SUPABASE_URL || 'NOT SET',
-    supabase_anon_key_full: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'NOT SET',
+    // Show partial URL so we can confirm it's correct without exposing full value
+    supabase_url_preview: process.env.NEXT_PUBLIC_SUPABASE_URL
+      ? process.env.NEXT_PUBLIC_SUPABASE_URL.slice(0, 30) + '...'
+      : 'NOT SET',
   }
 
   const allGood = checks.supabase_url && checks.supabase_anon_key && checks.supabase_service_role

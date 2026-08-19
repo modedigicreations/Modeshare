@@ -29,9 +29,13 @@ export default function TopBar({ profile }: Props) {
     window.location.replace(new URL('/login', window.location.origin).toString())
   }
 
-  const initials = profile.full_name
+  console.log("TopBar rendered with profile:", profile)
+
+  const initials = profile?.full_name
     ? profile.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : profile.email[0].toUpperCase()
+    : profile?.email
+      ? profile.email[0].toUpperCase()
+      : 'U'
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
