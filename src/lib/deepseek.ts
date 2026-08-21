@@ -126,3 +126,70 @@ export async function generatePosts(
     return post
   })
 }
+
+export async function rewritePost(
+  platform: Platform,
+  originalContent: string,
+  instruction: string
+): Promise<string> {
+  const apiKey = process.env.DEEPSEEK_API_KEY
+  if (!apiKey) throw new Error('DEEPSEEK_API_KEY is not configured')
+
+  const limit = PLATFORM_CHAR_LIMITS[platform]
+
+  const response = await fetch(DEEPSEEK_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a social media copywriter. You rewrite posts to follow instructions precisely and return ONLY the rewritten text, with no preamble, explanations, or quotes.',
+        },
+        {
+          role: 'user',
+          content: `Rewrite the following social media post for ${platform}.
+Original Post:
+"""
+${originalContent}
+"""
+
+Instruction:
+${instruction}
+
+Remember:
+- Return ONLY the rewritten post. No explanations, no markdown block wrappers, no quotes.
+- Respect the platform character limit of ${limit} characters.`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 1000,
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.text()
+    throw new Error(`DeepSeek API error ${response.status}: ${err}`)
+  }
+
+  const data = await response.json()
+  let rewritten = data.choices?.[0]?.message?.content?.trim()
+
+  if (!rewritten) throw new Error('Empty response from DeepSeek')
+
+  // Clean up any surrounding quotes if returned by the model
+  if (rewritten.startsWith('"') && rewritten.endsWith('"')) {
+    rewritten = rewritten.slice(1, -1).trim()
+  }
+
+  // Enforce limit
+  if (rewritten.length > limit) {
+    rewritten = rewritten.slice(0, limit - 1).trimEnd() + '…'
+  }
+
+  return rewritten
+}

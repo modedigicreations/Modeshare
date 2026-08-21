@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardCheck,
+  Sparkles,
 } from 'lucide-react'
 
 type EnrichedPost = Post & {
@@ -70,6 +71,8 @@ export default function ApprovalsClient({ initialPosts }: Props) {
   const [editContent, setEditContent] = useState<Record<string, string>>({})
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({})
   const [showRejectForm, setShowRejectForm] = useState<Record<string, boolean>>({})
+  const [showRewriteForm, setShowRewriteForm] = useState<Record<string, boolean>>({})
+  const [rewriteInstruction, setRewriteInstruction] = useState<Record<string, string>>({})
   const [scheduledAt, setScheduledAt] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState<Record<string, string>>({}) // postId -> action
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -121,6 +124,17 @@ export default function ApprovalsClient({ initialPosts }: Props) {
         [postId]: { ...prev[postId], status: 'rejected', reviewer_note: rejectNote[postId] },
       }))
       setShowRejectForm((prev) => ({ ...prev, [postId]: false }))
+    }
+  }
+
+  async function handleRewrite(postId: string) {
+    const instruction = rewriteInstruction[postId]
+    if (!instruction) return
+    const post = await callApi(postId, 'rewrite', { instruction })
+    if (post) {
+      setPostStates((prev) => ({ ...prev, [postId]: { ...prev[postId], content: post.content } }))
+      setShowRewriteForm((prev) => ({ ...prev, [postId]: false }))
+      setRewriteInstruction((prev) => ({ ...prev, [postId]: '' }))
     }
   }
 
@@ -256,23 +270,34 @@ export default function ApprovalsClient({ initialPosts }: Props) {
                       <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                         Post content
                       </label>
-                      {!isEditing ? (
-                        <button
-                          onClick={() => startEdit(post.id, state.content)}
-                          className="flex items-center gap-1 text-xs text-ms-blue hover:text-ms-blue-dark"
-                        >
-                          <Pencil size={12} />
-                          Edit
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => setEditing((prev) => ({ ...prev, [post.id]: false }))}
-                          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
-                        >
-                          <X size={12} />
-                          Cancel
-                        </button>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {!isEditing && (
+                          <button
+                            onClick={() => setShowRewriteForm((prev) => ({ ...prev, [post.id]: !showRewriteForm[post.id] }))}
+                            className="flex items-center gap-1 text-xs text-purple-600 hover:text-purple-700"
+                          >
+                            <Sparkles size={12} />
+                            AI Rewrite
+                          </button>
+                        )}
+                        {!isEditing ? (
+                          <button
+                            onClick={() => startEdit(post.id, state.content)}
+                            className="flex items-center gap-1 text-xs text-ms-blue hover:text-ms-blue-dark"
+                          >
+                            <Pencil size={12} />
+                            Edit
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setEditing((prev) => ({ ...prev, [post.id]: false }))}
+                            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            <X size={12} />
+                            Cancel
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {isEditing ? (
@@ -309,6 +334,43 @@ export default function ApprovalsClient({ initialPosts }: Props) {
                       </div>
                     )}
                   </div>
+
+                  {/* AI Rewrite Form */}
+                  {showRewriteForm[post.id] && (
+                    <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center gap-1 text-xs font-semibold text-purple-700">
+                        <Sparkles size={13} />
+                        Instruct AI to Rewrite
+                      </div>
+                      <textarea
+                        value={rewriteInstruction[post.id] || ''}
+                        onChange={(e) =>
+                          setRewriteInstruction((prev) => ({ ...prev, [post.id]: e.target.value }))
+                        }
+                        rows={2}
+                        placeholder="e.g. Make it punchier, add relevant hashtags, shorten it..."
+                        className="w-full px-3 py-2 border border-purple-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-200 bg-white resize-none"
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-purple-600 hover:bg-purple-700"
+                          loading={loading[post.id] === 'rewrite'}
+                          onClick={() => handleRewrite(post.id)}
+                        >
+                          <Sparkles size={13} />
+                          Rewrite Post
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowRewriteForm((prev) => ({ ...prev, [post.id]: false }))}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Schedule picker */}
                   <div>
