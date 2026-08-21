@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { Post } from '@/types/database'
+import { Post, UserRole } from '@/types/database'
 import CalendarClient from './CalendarClient'
 
 export const metadata = { title: 'Calendar — Modeshare' }
@@ -39,7 +39,10 @@ export default async function CalendarPage() {
           Approved, scheduled, and published posts
         </p>
       </div>
-      <CalendarClient posts={(posts as (Post & { brief: { topic: string } })[]) || []} />
+      <CalendarClient
+        posts={(posts as (Post & { brief: { topic: string } })[]) || []}
+        userRole={profile?.role as UserRole}
+      />
     </div>
   )
 }

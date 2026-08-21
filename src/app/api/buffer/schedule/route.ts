@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
-    if (post.status !== 'approved') {
+    const isSuperAdmin = profile?.role === 'super_admin'
+    if (post.status !== 'approved' && !isSuperAdmin) {
       return NextResponse.json({ error: 'Post must be approved before scheduling' }, { status: 400 })
     }
 
@@ -85,14 +86,18 @@ export async function POST(request: NextRequest) {
       platform
     )
 
-    // Update post status
+    // Update post status details
+    const updateData: Record<string, unknown> = {
+      buffer_post_id: bufferId,
+    }
+    if (post.status === 'approved') {
+      updateData.status = 'scheduled'
+      updateData.scheduled_at = post.scheduled_at || new Date().toISOString()
+    }
+
     await supabase
       .from('posts')
-      .update({
-        status: 'scheduled',
-        buffer_post_id: bufferId,
-        scheduled_at: post.scheduled_at || new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', postId)
 
     return NextResponse.json({ success: true, bufferId })

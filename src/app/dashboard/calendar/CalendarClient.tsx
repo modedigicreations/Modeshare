@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Post, Platform, PostStatus } from '@/types/database'
+import { Post, Platform, PostStatus, UserRole } from '@/types/database'
 import {
   PLATFORM_LABELS,
   PLATFORM_COLORS,
@@ -27,9 +27,10 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 interface Props {
   posts: EnrichedPost[]
+  userRole?: UserRole
 }
 
-export default function CalendarClient({ posts }: Props) {
+export default function CalendarClient({ posts, userRole }: Props) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -201,11 +202,18 @@ export default function CalendarClient({ posts }: Props) {
             <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
               {selectedPost.content}
             </p>
-            {selectedPost.status === 'approved' && (
-              <PushToBufferButton
-                postId={selectedPost.id}
-                onSuccess={() => handleBufferSuccess(selectedPost.id)}
-              />
+            {(selectedPost.status === 'approved' || (['scheduled', 'published'].includes(selectedPost.status) && userRole === 'super_admin')) && (
+              <div className="space-y-3">
+                {['scheduled', 'published'].includes(selectedPost.status) && (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                    As a Super Admin, you can re-share this post to your connected Buffer account.
+                  </p>
+                )}
+                <PushToBufferButton
+                  postId={selectedPost.id}
+                  onSuccess={() => handleBufferSuccess(selectedPost.id)}
+                />
+              </div>
             )}
           </div>
         </Card>
