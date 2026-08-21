@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS public.posts (
   scheduled_at    TIMESTAMPTZ,
   published_at    TIMESTAMPTZ,
   buffer_post_id  TEXT,   -- ID returned by Buffer after scheduling
+  metrics         JSONB NOT NULL DEFAULT '{}',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -219,3 +220,4 @@ CREATE INDEX IF NOT EXISTS idx_posts_user_id ON public.posts(user_id);
 CREATE INDEX IF NOT EXISTS idx_posts_status ON public.posts(status);
 CREATE INDEX IF NOT EXISTS idx_posts_platform ON public.posts(platform);
 CREATE INDEX IF NOT EXISTS idx_posts_scheduled_at ON public.posts(scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_posts_buffer_post_id ON public.posts(buffer_post_id);

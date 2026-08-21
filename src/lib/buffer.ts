@@ -256,3 +256,69 @@ export async function exchangeBufferCode(code: string, codeVerifier: string): Pr
   const data = await res.json()
   return data.access_token
 }
+
+export async function getPostMetrics(
+  accessToken: string,
+  bufferPostId: string
+): Promise<{ reactions: number; clicks: number; reposts: number; comments: number }> {
+  const query = `
+    query GetPostMetrics($input: PostInput!) {
+      post(input: $input) {
+        id
+        metrics {
+          type
+          name
+          value
+          unit
+        }
+      }
+    }
+  `
+
+  const res = await fetch('https://api.buffer.com', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      query,
+      variables: { input: { id: bufferPostId } },
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Buffer GraphQL metrics query failed: ${err}`)
+  }
+
+  const result = await res.json()
+  if (result.errors) {
+    throw new Error(`Buffer GraphQL error: ${result.errors[0]?.message || 'Unknown GraphQL error'}`)
+  }
+
+  const postData = result.data?.post
+  const metrics = postData?.metrics || []
+
+  const stats = {
+    reactions: 0,
+    clicks: 0,
+    reposts: 0,
+    comments: 0,
+  }
+
+  for (const m of metrics) {
+    const val = Number(m.value) || 0
+    if (m.type === 'reactions' || m.type === 'likes') {
+      stats.reactions = val
+    } else if (m.type === 'clicks') {
+      stats.clicks = val
+    } else if (m.type === 'reposts' || m.type === 'shares') {
+      stats.reposts = val
+    } else if (m.type === 'comments') {
+      stats.comments = val
+    }
+  }
+
+  return stats
+}

@@ -43,6 +43,13 @@ export interface Post {
   scheduled_at: string | null
   published_at: string | null
   buffer_post_id: string | null
+  metrics?: {
+    reactions?: number
+    clicks?: number
+    reposts?: number
+    comments?: number
+    updated_at?: string
+  }
   created_at: string
   updated_at: string
   // joined
