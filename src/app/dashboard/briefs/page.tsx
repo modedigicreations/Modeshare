@@ -37,13 +37,13 @@ export default async function BriefsPage() {
     .eq('id', user.id)
     .single()
 
-  // Approvers/admins see all briefs; creators see only their own
+  // Only super_admin sees all briefs; everyone else sees only their own
   let query = supabase
     .from('briefs')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (profile?.role === 'creator') {
+  if (profile?.role !== 'super_admin') {
     query = query.eq('user_id', user.id)
   }
 
@@ -54,7 +54,7 @@ export default async function BriefsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">
-            {profile?.role === 'creator' ? 'My Briefs' : 'All Briefs'}
+            {profile?.role === 'super_admin' ? 'All Briefs' : 'My Briefs'}
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {briefs?.length || 0} brief{briefs?.length !== 1 ? 's' : ''} total

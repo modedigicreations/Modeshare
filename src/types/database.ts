@@ -1,4 +1,4 @@
-export type UserRole = 'creator' | 'approver' | 'admin'
+export type UserRole = 'creator' | 'approver' | 'admin' | 'super_admin'
 export type Tone = 'professional' | 'casual' | 'witty' | 'informative' | 'inspirational'
 export type Platform = 'facebook' | 'twitter' | 'linkedin'
 export type BriefStatus = 'pending_generation' | 'generated' | 'in_review' | 'approved' | 'rejected'

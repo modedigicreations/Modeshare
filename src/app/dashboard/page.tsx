@@ -40,24 +40,32 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
+  const isSuperAdmin = profile?.role === 'super_admin'
   const isApprover = profile?.role !== 'creator'
 
   // Stats queries
+  let briefsQuery = supabase
+    .from('briefs')
+    .select('*', { count: 'exact', head: true })
+  
+  let postsQuery = supabase
+    .from('posts')
+    .select('*', { count: 'exact', head: true })
+
+  if (!isSuperAdmin) {
+    briefsQuery = briefsQuery.eq('user_id', user.id)
+    postsQuery = postsQuery.eq('user_id', user.id)
+  }
+
   const [
-    { count: myBriefsCount },
-    { count: myPostsCount },
+    { count: briefsCount },
+    { count: postsCount },
     { count: pendingApprovalCount },
     { count: scheduledCount },
     { count: publishedCount },
   ] = await Promise.all([
-    supabase
-      .from('briefs')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id),
-    supabase
-      .from('posts')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id),
+    briefsQuery,
+    postsQuery,
     supabase
       .from('posts')
       .select('*', { count: 'exact', head: true })
@@ -72,11 +80,12 @@ export default async function DashboardPage() {
       .eq('status', 'published'),
   ])
 
-  // Recent briefs (own)
-  const { data: recentBriefs } = await supabase
-    .from('briefs')
-    .select('*')
-    .eq('user_id', user.id)
+  // Recent briefs
+  let recentBriefsQuery = supabase.from('briefs').select('*')
+  if (!isSuperAdmin) {
+    recentBriefsQuery = recentBriefsQuery.eq('user_id', user.id)
+  }
+  const { data: recentBriefs } = await recentBriefsQuery
     .order('created_at', { ascending: false })
     .limit(5)
 
@@ -118,14 +127,14 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           icon={<PenSquare size={18} className="text-ms-blue" />}
-          label="My Briefs"
-          value={myBriefsCount ?? 0}
+          label={isSuperAdmin ? 'All Briefs' : 'My Briefs'}
+          value={briefsCount ?? 0}
           bg="bg-ms-blue/5"
         />
         <StatCard
           icon={<Sparkles size={18} className="text-purple-600" />}
-          label="Posts Generated"
-          value={myPostsCount ?? 0}
+          label={isSuperAdmin ? 'All Posts Generated' : 'Posts Generated'}
+          value={postsCount ?? 0}
           bg="bg-purple-50"
         />
         <StatCard

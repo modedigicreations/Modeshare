@@ -42,6 +42,7 @@ export default function RoleSwitcher({ currentRole }: Props) {
           <option value="creator">Creator</option>
           <option value="approver">Approver</option>
           <option value="admin">Admin</option>
+          <option value="super_admin">Super Admin</option>
         </select>
         {isUpdating && <Loader2 size={14} className="animate-spin text-ms-blue" />}
       </div>

@@ -52,6 +52,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   creator: 'Creator',
   approver: 'Approver',
   admin: 'Admin',
+  super_admin: 'Super Admin',
 }
 
 export function truncate(text: string, length: number): string {

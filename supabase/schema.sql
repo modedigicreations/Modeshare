@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email       TEXT NOT NULL,
   full_name   TEXT,
-  role        TEXT NOT NULL DEFAULT 'creator' CHECK (role IN ('creator', 'approver', 'admin')),
+  role        TEXT NOT NULL DEFAULT 'creator' CHECK (role IN ('creator', 'approver', 'admin', 'super_admin')),
   avatar_url  TEXT,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -136,7 +136,7 @@ AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role IN ('approver', 'admin')
+    WHERE id = auth.uid() AND role IN ('approver', 'admin', 'super_admin')
   );
 END;
 $$;
