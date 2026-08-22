@@ -112,44 +112,61 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Welcome */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Good {getTimeOfDay()}, {firstName} 👋
-        </h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Here&apos;s what&apos;s happening with your content today.
-        </p>
+    <div className="max-w-5xl mx-auto space-y-8">
+      {/* Welcome Hero Card */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-ms-blue-dark via-ms-blue to-[#001f5c] p-6 sm:p-8 text-white shadow-lg shadow-ms-blue/15 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div className="relative z-10 space-y-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 backdrop-blur-md text-blue-100 border border-white/10">
+            <Sparkles size={12} className="text-amber-300 animate-pulse" />
+            AI Marketing Suite
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Good {getTimeOfDay()}, {firstName} 👋
+          </h1>
+          <p className="text-blue-100 text-sm max-w-md">
+            Draft topics, generate high-impact platform variants, and publish instantly through Buffer.
+          </p>
+        </div>
+        <div className="relative z-10 shrink-0 flex gap-3">
+          <Link href="/dashboard/briefs/new">
+            <Button variant="primary" className="bg-ms-red hover:bg-ms-red-dark hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 shadow-md shadow-ms-red/20 font-semibold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 border-0">
+              <PenSquare size={16} />
+              Create New Brief
+            </Button>
+          </Link>
+        </div>
+        {/* Decorative ambient background blur lights */}
+        <div className="absolute right-0 bottom-0 w-64 h-64 bg-ms-red/10 rounded-full blur-3xl translate-x-12 translate-y-12 pointer-events-none" />
+        <div className="absolute left-1/3 top-0 w-32 h-32 bg-blue-400/10 rounded-full blur-2xl pointer-events-none" />
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
-          icon={<PenSquare size={18} className="text-ms-blue" />}
+          icon={<PenSquare size={20} />}
           label={isSuperAdmin ? 'All Briefs' : 'My Briefs'}
           value={briefsCount ?? 0}
-          bg="bg-ms-blue/5"
+          bg="bg-blue-50 border-blue-100/50 text-blue-600"
         />
         <StatCard
-          icon={<Sparkles size={18} className="text-purple-600" />}
+          icon={<Sparkles size={20} />}
           label={isSuperAdmin ? 'All Posts Generated' : 'Posts Generated'}
           value={postsCount ?? 0}
-          bg="bg-purple-50"
+          bg="bg-purple-50 border-purple-100/50 text-purple-600"
         />
         <StatCard
-          icon={<Clock size={18} className="text-amber-600" />}
+          icon={<Clock size={20} />}
           label={isApprover ? 'Awaiting Approval' : 'Pending Review'}
           value={isApprover ? (pendingApprovalCount ?? 0) : (pendingPosts?.length ?? 0)}
-          bg="bg-amber-50"
+          bg="bg-amber-50 border-amber-100/50 text-amber-600"
           href={isApprover ? '/dashboard/approvals' : undefined}
           alert={isApprover && (pendingApprovalCount ?? 0) > 0}
         />
         <StatCard
-          icon={<Send size={18} className="text-green-600" />}
+          icon={<Send size={20} />}
           label="Scheduled"
           value={scheduledCount ?? 0}
-          bg="bg-green-50"
+          bg="bg-green-50 border-green-100/50 text-green-600"
           href="/dashboard/calendar"
         />
       </div>
@@ -159,10 +176,10 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800">Recent Briefs</h2>
+              <h2 className="font-bold text-slate-800">Recent Briefs</h2>
               <Link
                 href="/dashboard/briefs"
-                className="text-xs text-ms-blue hover:text-ms-blue-dark flex items-center gap-1"
+                className="text-xs font-semibold text-ms-blue hover:text-ms-blue-dark flex items-center gap-1 transition-colors"
               >
                 View all <ChevronRight size={12} />
               </Link>
@@ -170,41 +187,46 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardBody className="p-0">
             {!recentBriefs?.length ? (
-              <div className="flex flex-col items-center py-10 text-center px-6">
-                <PenSquare size={20} className="text-gray-300 mb-2" />
-                <p className="text-sm text-gray-400">No briefs yet</p>
-                <Link href="/dashboard/briefs/new" className="mt-3">
-                  <Button size="sm">Create brief</Button>
+              <div className="flex flex-col items-center py-12 text-center px-6">
+                <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                  <PenSquare size={20} className="text-slate-300" />
+                </div>
+                <p className="text-sm font-medium text-slate-400">No briefs created yet</p>
+                <Link href="/dashboard/briefs/new" className="mt-4">
+                  <Button size="sm" className="rounded-xl px-4 font-semibold shadow-sm">Create brief</Button>
                 </Link>
               </div>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-slate-100">
                 {recentBriefs.map((brief) => (
-                  <li key={brief.id}>
+                  <li key={brief.id} className="first:rounded-t-2xl last:rounded-b-2xl overflow-hidden">
                     <Link
                       href={`/dashboard/briefs/${brief.id}`}
-                      className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition"
+                      className="flex items-center justify-between gap-4 px-6 py-4.5 hover:bg-slate-50/70 border-l-2 border-transparent hover:border-ms-blue transition-all duration-200 group"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">
+                        <p className="text-sm font-semibold text-slate-700 truncate group-hover:text-ms-blue transition-colors duration-150">
                           {brief.topic}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-gray-400">
+                        <div className="flex items-center gap-3 mt-1.5">
+                          <span className="text-xs text-slate-400 font-medium">
                             {formatDateTime(brief.created_at)}
                           </span>
-                          <div className="flex gap-1">
+                          <div className="flex gap-1.5">
                             {(brief.platforms as Platform[]).map((p) => (
-                              <Badge key={p} className={cn(PLATFORM_COLORS[p], 'text-[10px]')}>
+                              <Badge key={p} className={cn(PLATFORM_COLORS[p], 'text-[10px] font-semibold px-2 py-0.5 rounded-md shadow-xs')}>
                                 {PLATFORM_LABELS[p]}
                               </Badge>
                             ))}
                           </div>
                         </div>
                       </div>
-                      <Badge className={BRIEF_STATUS_COLORS[brief.status as BriefStatus]}>
-                        {BRIEF_STATUS_LABELS[brief.status as BriefStatus]}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={cn(BRIEF_STATUS_COLORS[brief.status as BriefStatus], 'font-semibold px-2.5 py-0.5 rounded-full')}>
+                          {BRIEF_STATUS_LABELS[brief.status as BriefStatus]}
+                        </Badge>
+                        <ChevronRight size={14} className="text-slate-300 group-hover:text-slate-400 transition-transform group-hover:translate-x-0.5 duration-200 shrink-0" />
+                      </div>
                     </Link>
                   </li>
                 ))}
@@ -217,13 +239,13 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-gray-800">
+              <h2 className="font-bold text-slate-800">
                 {isApprover ? 'Needs Approval' : 'My Pending Posts'}
               </h2>
               {isApprover && (
                 <Link
                   href="/dashboard/approvals"
-                  className="text-xs text-ms-blue hover:text-ms-blue-dark flex items-center gap-1"
+                  className="text-xs font-semibold text-ms-blue hover:text-ms-blue-dark flex items-center gap-1 transition-colors"
                 >
                   Review all <ChevronRight size={12} />
                 </Link>
@@ -232,34 +254,36 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardBody className="p-0">
             {!pendingPosts?.length ? (
-              <div className="flex flex-col items-center py-10 text-center px-6">
-                <CheckCircle2 size={20} className="text-green-400 mb-2" />
-                <p className="text-sm text-gray-400">
+              <div className="flex flex-col items-center py-12 text-center px-6">
+                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center mb-3">
+                  <CheckCircle2 size={20} className="text-green-500" />
+                </div>
+                <p className="text-sm font-medium text-slate-400">
                   {isApprover ? 'Nothing to review — all clear!' : 'No posts pending review'}
                 </p>
               </div>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-slate-100">
                 {pendingPosts.map((post) => (
-                  <li key={post.id} className="px-5 py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-800 truncate">
+                  <li key={post.id} className="first:rounded-t-2xl last:rounded-b-2xl overflow-hidden">
+                    <div className="flex items-center justify-between gap-4 px-6 py-4.5 hover:bg-slate-50/50 border-l-2 border-transparent hover:border-amber-500 transition-all duration-200 group">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-slate-700 truncate">
                           {(post.brief as { topic: string })?.topic}
                         </p>
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">
-                          {truncate(post.content, 80)}
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-1 italic">
+                          &ldquo;{truncate(post.content, 90)}&rdquo;
                         </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge className={cn(PLATFORM_COLORS[post.platform as Platform], 'text-[10px]')}>
+                        <div className="flex items-center gap-3 mt-2">
+                          <Badge className={cn(PLATFORM_COLORS[post.platform as Platform], 'text-[10px] font-semibold px-2 py-0.5 rounded-md shadow-xs')}>
                             {PLATFORM_LABELS[post.platform as Platform]}
                           </Badge>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-100 px-1.5 py-0.5 rounded-md">
                             Variant {post.variant_index}
                           </span>
                         </div>
                       </div>
-                      <Badge className={POST_STATUS_COLORS[post.status as PostStatus]}>
+                      <Badge className={cn(POST_STATUS_COLORS[post.status as PostStatus], 'font-semibold px-2.5 py-0.5 rounded-full shrink-0')}>
                         {POST_STATUS_LABELS[post.status as PostStatus]}
                       </Badge>
                     </div>
@@ -273,16 +297,16 @@ export default async function DashboardPage() {
 
       {/* Published count banner */}
       {(publishedCount ?? 0) > 0 && (
-        <Card>
-          <div className="px-6 py-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
-              <TrendingUp size={18} className="text-purple-600" />
+        <Card className="overflow-hidden border-l-4 border-l-purple-600 bg-gradient-to-r from-purple-50/50 to-transparent">
+          <div className="px-6 py-5 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-purple-100/80 flex items-center justify-center shrink-0 shadow-sm">
+              <TrendingUp size={20} className="text-purple-700" />
             </div>
             <div>
-              <p className="font-semibold text-gray-800">
+              <p className="font-bold text-slate-800 text-base">
                 {publishedCount} post{publishedCount !== 1 ? 's' : ''} published
               </p>
-              <p className="text-xs text-gray-500">Total posts sent to social media via Buffer</p>
+              <p className="text-xs font-medium text-slate-400 mt-0.5">Total social media updates published via Buffer connection.</p>
             </div>
           </div>
         </Card>
@@ -307,21 +331,27 @@ function StatCard({
   alert?: boolean
 }) {
   const inner = (
-    <Card className={cn('relative', href && 'hover:border-ms-blue/40 transition cursor-pointer')}>
-      <div className="px-5 py-4">
-        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center mb-3', bg)}>
+    <Card className={cn(
+      'relative group overflow-hidden border border-slate-200/50 hover:border-slate-300/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 cursor-default',
+      href && 'cursor-pointer hover:border-ms-blue/30'
+    )}>
+      <div className="px-5 py-5 flex items-center justify-between">
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+          <p className="text-3xl font-extrabold text-slate-800 tracking-tight transition-all group-hover:scale-105 origin-left duration-300">{value}</p>
+        </div>
+        <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300 shadow-xs border border-slate-200/20', bg)}>
           {icon}
         </div>
-        <p className="text-2xl font-bold text-gray-900">{value}</p>
-        <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-        {alert && value > 0 && (
-          <span className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-ms-red animate-pulse" />
-        )}
       </div>
+      {alert && value > 0 && (
+        <span className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-ms-red animate-pulse shadow-md shadow-ms-red/50" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-slate-500/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
     </Card>
   )
 
-  return href ? <Link href={href}>{inner}</Link> : inner
+  return href ? <Link href={href} className="block">{inner}</Link> : inner
 }
 
 function getTimeOfDay(): string {

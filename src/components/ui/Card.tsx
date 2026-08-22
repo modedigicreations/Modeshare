@@ -7,7 +7,7 @@ interface Props {
 
 export function Card({ children, className }: Props) {
   return (
-    <div className={cn('bg-white rounded-xl border border-gray-200 shadow-sm', className)}>
+    <div className={cn('bg-white/90 backdrop-blur-sm rounded-2xl border border-slate-200/60 shadow-xs transition-all duration-300', className)}>
       {children}
     </div>
   )
@@ -15,7 +15,7 @@ export function Card({ children, className }: Props) {
 
 export function CardHeader({ children, className }: Props) {
   return (
-    <div className={cn('px-6 py-4 border-b border-gray-100', className)}>
+    <div className={cn('px-6 py-5 border-b border-slate-100/80', className)}>
       {children}
     </div>
   )
@@ -23,7 +23,7 @@ export function CardHeader({ children, className }: Props) {
 
 export function CardBody({ children, className }: Props) {
   return (
-    <div className={cn('px-6 py-4', className)}>
+    <div className={cn('px-6 py-5', className)}>
       {children}
     </div>
   )

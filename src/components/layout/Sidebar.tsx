@@ -70,34 +70,34 @@ export default function Sidebar({ role, open, onClose }: Props) {
 
       <aside
         className={cn(
-          'w-60 bg-ms-blue-dark flex flex-col shrink-0 transition-transform duration-200 z-50',
+          'w-60 bg-gradient-to-b from-[#091124] via-[#0d162c] to-[#050b18] border-r border-white/5 flex flex-col shrink-0 transition-transform duration-200 z-50',
           'fixed inset-y-0 left-0 lg:relative lg:translate-x-0 lg:flex',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         {/* Logo and Mobile Close */}
-        <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
+        <div className="px-6 py-6 border-b border-white/10 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2.5" onClick={onClose}>
-            <div className="w-8 h-8 rounded-lg bg-ms-red flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-ms-red flex items-center justify-center shrink-0 shadow-lg shadow-ms-red/40 animate-pulse">
               <span className="text-white font-bold text-sm">M</span>
             </div>
-            <span className="text-white font-bold text-lg tracking-tight text-white">Modeshare</span>
+            <span className="text-white font-bold text-lg tracking-tight">Modeshare</span>
           </Link>
           <button
             onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-blue-200 hover:text-white hover:bg-white/10 transition"
+            className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition"
           >
             <X size={18} />
           </button>
         </div>
         
-        <div className="px-5 py-2 flex items-center gap-1.5 ml-8 mt-1">
-          <Share2 size={11} className="text-blue-300" />
-          <span className="text-blue-300 text-xs">Social Publisher</span>
+        <div className="px-6 py-2.5 flex items-center gap-2 mt-2">
+          <Share2 size={12} className="text-slate-400" />
+          <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Social Publisher</span>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <nav className="flex-1 px-4 py-4 space-y-1.5">
           {visible.map((item) => {
             const active =
               item.href === '/dashboard'
@@ -110,13 +110,13 @@ export default function Sidebar({ role, open, onClose }: Props) {
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                   active
-                    ? 'bg-ms-red text-white'
-                    : 'text-blue-200 hover:bg-white/10 hover:text-white'
+                    ? 'bg-gradient-to-r from-ms-red to-red-500 text-white shadow-lg shadow-ms-red/25 font-semibold'
+                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
                 )}
               >
-                <item.icon size={18} />
+                <item.icon size={18} className={cn(active ? 'text-white' : 'text-slate-400')} />
                 {item.label}
               </Link>
             )
@@ -124,8 +124,8 @@ export default function Sidebar({ role, open, onClose }: Props) {
         </nav>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-white/10">
-          <p className="text-blue-400 text-xs text-center">Internal use only</p>
+        <div className="px-4 py-4 border-t border-white/10 bg-black/20">
+          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wider text-center">Internal use only</p>
         </div>
       </aside>
     </>
