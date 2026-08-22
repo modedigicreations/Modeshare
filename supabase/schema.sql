@@ -214,10 +214,13 @@ DROP POLICY IF EXISTS "posts_update_approver" ON public.posts;
 CREATE POLICY "posts_update_approver" ON public.posts
   FOR UPDATE USING ( public.is_admin_or_approver() );
 
--- Buffer connections: only owner
 DROP POLICY IF EXISTS "buffer_select_own" ON public.buffer_connections;
 CREATE POLICY "buffer_select_own" ON public.buffer_connections
   FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "buffer_select_team" ON public.buffer_connections;
+CREATE POLICY "buffer_select_team" ON public.buffer_connections
+  FOR SELECT USING ( public.is_admin_or_approver() );
 
 DROP POLICY IF EXISTS "buffer_insert_own" ON public.buffer_connections;
 CREATE POLICY "buffer_insert_own" ON public.buffer_connections
