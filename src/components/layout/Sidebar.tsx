@@ -12,6 +12,7 @@ import {
   Share2,
   BarChart3,
   X,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { UserRole } from '@/types/database'
@@ -35,6 +36,12 @@ const navItems: NavItem[] = [
   },
   { href: '/dashboard/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
+  {
+    href: '/dashboard/users',
+    label: 'Users',
+    icon: Users,
+    roles: ['super_admin'],
+  },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
 

@@ -142,6 +142,19 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.is_admin_or_super_admin()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role IN ('admin', 'super_admin')
+  );
+END;
+$$;
+
 -- Profiles: users see their own, admins/approvers see all
 DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
 CREATE POLICY "profiles_select_own" ON public.profiles
@@ -154,6 +167,10 @@ CREATE POLICY "profiles_select_team" ON public.profiles
 DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
 CREATE POLICY "profiles_update_own" ON public.profiles
   FOR UPDATE USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "profiles_update_admin" ON public.profiles;
+CREATE POLICY "profiles_update_admin" ON public.profiles
+  FOR UPDATE USING ( public.is_admin_or_super_admin() );
 
 -- Briefs: creators see their own, approvers/admins see all
 DROP POLICY IF EXISTS "briefs_select_own" ON public.briefs;
