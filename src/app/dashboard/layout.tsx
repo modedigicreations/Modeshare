@@ -2,8 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import Sidebar from '@/components/layout/Sidebar'
-import TopBar from '@/components/layout/TopBar'
+import DashboardLayoutClient from '@/components/layout/DashboardLayoutClient'
 
 export default async function DashboardLayout({
   children,
@@ -55,14 +54,8 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar role={profile.role} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar profile={profile} />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
-      </div>
-    </div>
+    <DashboardLayoutClient role={profile.role} profile={profile}>
+      {children}
+    </DashboardLayoutClient>
   )
 }

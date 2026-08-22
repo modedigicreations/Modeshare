@@ -2,15 +2,16 @@
 
 import { Profile } from '@/types/database'
 import { ROLE_LABELS } from '@/lib/utils'
-import { LogOut, ChevronDown } from 'lucide-react'
+import { LogOut, ChevronDown, Menu } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { logoutAction } from '@/app/auth/actions'
 
 interface Props {
   profile: Profile
+  onMenuClick?: () => void
 }
 
-export default function TopBar({ profile }: Props) {
+export default function TopBar({ profile, onMenuClick }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -39,7 +40,12 @@ export default function TopBar({ profile }: Props) {
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
-      <div />
+      <button
+        onClick={onMenuClick}
+        className="lg:hidden p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 transition mr-2"
+      >
+        <Menu size={20} />
+      </button>
 
       <div className="relative" ref={ref}>
         <button

@@ -108,7 +108,8 @@ export default function CalendarClient({ posts, userRole }: Props) {
           <div className="grid grid-cols-7 mb-1">
             {DAY_NAMES.map((d) => (
               <div key={d} className="text-center text-xs font-medium text-gray-400 py-1">
-                {d}
+                <span className="hidden sm:inline">{d}</span>
+                <span className="sm:hidden">{d[0]}</span>
               </div>
             ))}
           </div>
@@ -126,7 +127,7 @@ export default function CalendarClient({ posts, userRole }: Props) {
                 <div
                   key={idx}
                   className={cn(
-                    'bg-white min-h-[80px] p-1.5',
+                    'bg-white min-h-[50px] sm:min-h-[80px] p-1 sm:p-1.5',
                     !day && 'bg-gray-50/50'
                   )}
                 >
@@ -134,7 +135,7 @@ export default function CalendarClient({ posts, userRole }: Props) {
                     <>
                       <span
                         className={cn(
-                          'inline-flex w-6 h-6 items-center justify-center rounded-full text-xs font-medium mb-1',
+                          'inline-flex w-5 h-5 sm:w-6 sm:h-6 items-center justify-center rounded-full text-xs font-medium mb-1',
                           isToday
                             ? 'bg-ms-red text-white'
                             : 'text-gray-700'
@@ -143,23 +144,50 @@ export default function CalendarClient({ posts, userRole }: Props) {
                         {day}
                       </span>
                       <div className="space-y-0.5">
-                        {dayPosts.slice(0, 3).map((p) => (
-                          <button
-                            key={p.id}
-                            onClick={() => setSelectedPost(p)}
-                            className={cn(
-                              'w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate transition hover:opacity-80',
-                              PLATFORM_COLORS[p.platform as Platform]
-                            )}
-                          >
-                            {PLATFORM_LABELS[p.platform as Platform]}
-                          </button>
-                        ))}
-                        {dayPosts.length > 3 && (
-                          <p className="text-[10px] text-gray-400 pl-1">
-                            +{dayPosts.length - 3} more
-                          </p>
-                        )}
+                        {/* Desktop view: text badges */}
+                        <div className="hidden sm:block space-y-0.5">
+                          {dayPosts.slice(0, 3).map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() => setSelectedPost(p)}
+                              className={cn(
+                                'w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate transition hover:opacity-80',
+                                PLATFORM_COLORS[p.platform as Platform]
+                              )}
+                            >
+                              {PLATFORM_LABELS[p.platform as Platform]}
+                            </button>
+                          ))}
+                          {dayPosts.length > 3 && (
+                            <p className="text-[10px] text-gray-400 pl-1">
+                              +{dayPosts.length - 3} more
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Mobile view: colored dots */}
+                        <div className="flex flex-wrap gap-0.5 justify-center sm:hidden">
+                          {dayPosts.slice(0, 4).map((p) => (
+                            <button
+                              key={p.id}
+                              onClick={() => setSelectedPost(p)}
+                              title={PLATFORM_LABELS[p.platform as Platform]}
+                              className={cn(
+                                'w-1.5 h-1.5 rounded-full transition hover:opacity-80',
+                                p.platform === 'facebook'
+                                  ? 'bg-blue-600'
+                                  : p.platform === 'twitter'
+                                    ? 'bg-sky-500'
+                                    : 'bg-indigo-700'
+                              )}
+                            />
+                          ))}
+                          {dayPosts.length > 4 && (
+                            <span className="text-[8px] text-gray-400 font-bold leading-none">
+                              +
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </>
                   )}
