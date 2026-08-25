@@ -19,9 +19,10 @@ export async function sendEmail({
   }
 
   const resend = new Resend(resendApiKey)
+  const fromEmail = process.env.RESEND_FROM_EMAIL || 'Modeshare Notifications <onboarding@resend.dev>'
   try {
     const { data, error } = await resend.emails.send({
-      from: 'Modeshare Notifications <onboarding@resend.dev>',
+      from: fromEmail,
       to,
       subject,
       html,
