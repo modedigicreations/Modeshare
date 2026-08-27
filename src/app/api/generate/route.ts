@@ -94,8 +94,8 @@ export async function POST(request: NextRequest) {
       .update({ status: 'generated' })
       .eq('id', brief.id)
 
-    // Trigger notification async
-    notifySuperAdmins({
+    // Trigger notification and wait for it to complete before returning
+    await notifySuperAdmins({
       subject: '🔔 Modeshare: New AI Posts Generated',
       html: `
         <div style="font-family: sans-serif; max-width: 550px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">

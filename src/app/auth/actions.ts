@@ -57,9 +57,9 @@ export async function signupAction(formData: FormData) {
       return { success: false, error: error.message }
     }
 
-    // Trigger notification async so signup response is not blocked
+    // Trigger notification and wait for it to complete
     if (data?.user) {
-      notifySuperAdmins({
+      await notifySuperAdmins({
         subject: '🔔 Modeshare: New User Registered',
         html: `
           <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
