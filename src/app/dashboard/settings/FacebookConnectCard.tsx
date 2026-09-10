@@ -54,6 +54,8 @@ export default function FacebookConnectCard({
   const [, startTransition] = useTransition()
 
   const [configId, setConfigId] = useState('')
+  const [manualToken, setManualToken] = useState('')
+  const [savingToken, setSavingToken] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -64,6 +66,32 @@ export default function FacebookConnectCard({
       }
     }
   }, [])
+
+  async function handleManualTokenConnect() {
+    if (!manualToken.trim()) return
+    setSavingToken(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const res = await fetch('/api/facebook/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: manualToken.trim() }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to connect Facebook Page')
+
+      setSuccess(`Connected successfully to ${data.page?.name || 'Facebook Page'}!`)
+      setTimeout(() => {
+        window.location.reload()
+      }, 1500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to connect Facebook account')
+      setSavingToken(false)
+    }
+  }
 
   function handleConfigIdChange(val: string) {
     const trimmed = val.trim()
@@ -392,6 +420,45 @@ export default function FacebookConnectCard({
                       </>
                     )}
                   </button>
+                </div>
+
+                {/* Instant Token Fallback (Bypasses OAuth Redirects) */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 text-xs text-slate-700">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-900 flex items-center gap-1.5">
+                      <span>⚡ Instant 1-Click Setup (Meta Graph Token)</span>
+                    </span>
+                    <a
+                      href="https://developers.facebook.com/tools/explorer/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-700 font-medium inline-flex items-center gap-1"
+                    >
+                      Open Graph Explorer <ExternalLink size={11} />
+                    </a>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Bypass OAuth redirect settings completely: Generate an access token in Meta&apos;s Graph API Explorer and paste it below:
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Paste User or Page Access Token (EAA...)"
+                      value={manualToken}
+                      onChange={(e) => setManualToken(e.target.value)}
+                      className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleManualTokenConnect}
+                      loading={savingToken}
+                      disabled={!manualToken.trim()}
+                      className="bg-slate-900 hover:bg-black text-white shrink-0 text-xs px-3"
+                    >
+                      Connect Page
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-2">
