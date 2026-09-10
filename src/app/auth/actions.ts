@@ -132,3 +132,60 @@ export async function updateRoleAction(role: UserRole) {
     return { success: false, error: err instanceof Error ? err.message : 'Failed to update role' }
   }
 }
+
+export async function forgotPasswordAction(formData: FormData, origin?: string) {
+  try {
+    const supabase = await createClient()
+    const email = (formData.get('email') as string)?.trim()
+
+    if (!email) {
+      return { success: false, error: 'Email address is required.' }
+    }
+
+    const appOrigin = origin || (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '') || 'https://modeshare.net'
+    const redirectTo = `${appOrigin}/auth/callback?next=/reset-password`
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    console.error('Forgot password error:', err)
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to send reset email.' }
+  }
+}
+
+export async function resetPasswordAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+    const password = formData.get('password') as string
+    const confirmPassword = formData.get('confirmPassword') as string
+
+    if (!password || password.length < 8) {
+      return { success: false, error: 'Password must be at least 8 characters long.' }
+    }
+
+    if (password !== confirmPassword) {
+      return { success: false, error: 'Passwords do not match.' }
+    }
+
+    const { error } = await supabase.auth.updateUser({
+      password,
+    })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath('/', 'layout')
+    return { success: true }
+  } catch (err) {
+    console.error('Reset password error:', err)
+    return { success: false, error: err instanceof Error ? err.message : 'Failed to reset password.' }
+  }
+}
