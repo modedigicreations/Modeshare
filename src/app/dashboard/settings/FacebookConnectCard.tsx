@@ -362,27 +362,37 @@ export default function FacebookConnectCard({
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleConnectSdk}
-                  disabled={connecting}
-                  className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm cursor-pointer disabled:opacity-75"
-                >
-                  {connecting ? (
-                    <>
-                      <RefreshCw size={15} className="animate-spin" />
-                      Connecting Facebook...
-                    </>
-                  ) : (
-                    <>
-                      <FacebookIcon size={16} />
-                      Connect Facebook Page
-                      <ExternalLink size={13} className="opacity-80" />
-                    </>
-                  )}
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <a
+                    href={configId ? `/api/facebook/connect?config_id=${encodeURIComponent(configId)}` : '/api/facebook/connect'}
+                    className="inline-flex items-center justify-center gap-2 flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm cursor-pointer"
+                  >
+                    <FacebookIcon size={16} />
+                    Connect via Direct OAuth
+                    <ArrowRight size={13} className="opacity-80" />
+                  </a>
 
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-1.5">
+                  <button
+                    type="button"
+                    onClick={handleConnectSdk}
+                    disabled={connecting}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs transition cursor-pointer disabled:opacity-75"
+                  >
+                    {connecting ? (
+                      <>
+                        <RefreshCw size={13} className="animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        Connect via Popup
+                        <ExternalLink size={12} className="opacity-70" />
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-2">
                   <div className="font-semibold text-gray-800 flex items-center justify-between">
                     <span>Required Redirect URI in Meta Console:</span>
                     <button
@@ -400,15 +410,9 @@ export default function FacebookConnectCard({
                   <code className="block font-mono text-[11px] text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 select-all break-all">
                     {origin || 'https://modeshare.net'}/api/facebook/callback
                   </code>
-                </div>
-
-                <div className="text-center pt-0.5">
-                  <a
-                    href={configId ? `/api/facebook/connect?config_id=${encodeURIComponent(configId)}` : '/api/facebook/connect'}
-                    className="text-xs text-gray-500 hover:text-blue-600 font-medium inline-flex items-center gap-1 transition"
-                  >
-                    Direct OAuth Redirect Link <ArrowRight size={11} />
-                  </a>
+                  <p className="text-[11px] text-gray-500">
+                    Paste in <strong>Facebook Login for Business &rarr; Settings &rarr; Valid OAuth Redirect URIs</strong>
+                  </p>
                 </div>
               </div>
             )}
