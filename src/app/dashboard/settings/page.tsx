@@ -160,6 +160,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         pageId={facebookConn?.page_id || null}
         connectedAt={facebookConn?.connected_at || null}
         appIdConfigured={isFbConfigured}
+        appId={process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || ''}
       />
 
       {/* Buffer integration */}

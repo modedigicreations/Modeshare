@@ -30,6 +30,7 @@ interface Props {
   pageId: string | null
   connectedAt: string | null
   appIdConfigured: boolean
+  appId?: string
 }
 
 export default function FacebookConnectCard({
@@ -37,6 +38,7 @@ export default function FacebookConnectCard({
   pageName,
   pageId,
   appIdConfigured,
+  appId,
 }: Props) {
   const [pages, setPages] = useState<PageOption[]>([])
   const [loadingPages, setLoadingPages] = useState(false)
@@ -394,7 +396,7 @@ export default function FacebookConnectCard({
 
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-2">
                   <div className="font-semibold text-gray-800 flex items-center justify-between">
-                    <span>Required Redirect URI in Meta Console:</span>
+                    <span>Active OAuth Configuration in Modeshare:</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -404,14 +406,16 @@ export default function FacebookConnectCard({
                       }}
                       className="text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
                     >
-                      {copied ? 'Copied!' : 'Copy URI'}
+                      {copied ? 'Copied URI!' : 'Copy URI'}
                     </button>
                   </div>
-                  <code className="block font-mono text-[11px] text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 select-all break-all">
-                    {origin || 'https://modeshare.net'}/api/facebook/callback
-                  </code>
+                  <div className="space-y-1 text-[11px] font-mono bg-white border border-gray-200 rounded p-2 text-gray-700">
+                    <div><strong>App ID:</strong> {appId || '(Not set in env)'}</div>
+                    <div><strong>Redirect URI:</strong> {origin || 'https://modeshare.net'}/api/facebook/callback</div>
+                    <div><strong>Config ID:</strong> {configId || '(None — using standard scopes)'}</div>
+                  </div>
                   <p className="text-[11px] text-gray-500">
-                    Paste in <strong>Facebook Login for Business &rarr; Settings &rarr; Valid OAuth Redirect URIs</strong>
+                    Ensure <strong>{origin || 'https://modeshare.net'}/api/facebook/callback</strong> is saved as a tag in <strong>Facebook Login for Business &rarr; Settings &rarr; Valid OAuth Redirect URIs</strong>.
                   </p>
                 </div>
               </div>
