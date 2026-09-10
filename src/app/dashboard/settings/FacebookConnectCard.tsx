@@ -126,6 +126,14 @@ export default function FacebookConnectCard({
     }, 10000)
 
     try {
+      const configId = process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || ''
+      const loginOptions = configId
+        ? { config_id: configId }
+        : {
+            scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,public_profile',
+            return_scopes: true,
+          }
+
       if (typeof window !== 'undefined' && window.FB) {
         window.FB.login(
           async (response) => {
@@ -151,10 +159,7 @@ export default function FacebookConnectCard({
               setConnecting(false)
             }
           },
-          {
-            scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,public_profile',
-            return_scopes: true,
-          }
+          loginOptions as any
         )
       } else {
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
@@ -165,6 +170,7 @@ export default function FacebookConnectCard({
       setConnecting(false)
       window.location.href = '/api/facebook/connect'
     }
+
   }
 
   async function handleDisconnect() {

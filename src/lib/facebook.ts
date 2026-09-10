@@ -50,24 +50,30 @@ export function resolveFacebookRedirectUri(requestOrigin?: string): string {
 export function getFacebookAuthUrl(state: string, requestOrigin?: string): string {
   const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
   const redirectUri = resolveFacebookRedirectUri(requestOrigin)
-
-  const scopes = [
-    'pages_show_list',
-    'pages_read_engagement',
-    'pages_manage_posts',
-    'public_profile',
-  ].join(',')
+  const configId = (process.env.FACEBOOK_CONFIG_ID || process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || '').trim()
 
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     state,
-    scope: scopes,
     response_type: 'code',
   })
 
+  if (configId) {
+    params.set('config_id', configId)
+  } else {
+    const scopes = [
+      'pages_show_list',
+      'pages_read_engagement',
+      'pages_manage_posts',
+      'public_profile',
+    ].join(',')
+    params.set('scope', scopes)
+  }
+
   return `https://www.facebook.com/${FB_GRAPH_VERSION}/dialog/oauth?${params.toString()}`
 }
+
 
 /**
  * Upgrade short-lived token to long-lived 60-day token
