@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Post, Platform, PostStatus, UserRole } from '@/types/database'
+import { Post, Platform, PostStatus, UserRole, FacebookProvider } from '@/types/database'
 import {
   PLATFORM_LABELS,
   PLATFORM_COLORS,
@@ -28,9 +28,10 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 interface Props {
   posts: EnrichedPost[]
   userRole?: UserRole
+  facebookProvider?: FacebookProvider
 }
 
-export default function CalendarClient({ posts, userRole }: Props) {
+export default function CalendarClient({ posts, userRole, facebookProvider = 'buffer' }: Props) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -234,11 +235,13 @@ export default function CalendarClient({ posts, userRole }: Props) {
               <div className="space-y-3">
                 {['scheduled', 'published'].includes(selectedPost.status) && (
                   <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
-                    As a Super Admin, you can re-share this post to your connected Buffer account.
+                    As a Super Admin, you can re-share or re-schedule this post.
                   </p>
                 )}
                 <PushToBufferButton
                   postId={selectedPost.id}
+                  platform={selectedPost.platform as Platform}
+                  provider={facebookProvider}
                   onSuccess={() => handleBufferSuccess(selectedPost.id)}
                 />
               </div>
@@ -253,7 +256,7 @@ export default function CalendarClient({ posts, userRole }: Props) {
           <div className="px-5 py-4 border-b border-gray-100">
             <h3 className="font-semibold text-gray-800">Approved — Not Yet Scheduled</h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Push to Buffer to add these to the queue
+              Push to schedule or queue these posts
             </p>
           </div>
           <div className="divide-y divide-gray-100">
@@ -270,6 +273,8 @@ export default function CalendarClient({ posts, userRole }: Props) {
                 </div>
                 <PushToBufferButton
                   postId={p.id}
+                  platform={p.platform as Platform}
+                  provider={facebookProvider}
                   onSuccess={() => handleBufferSuccess(p.id)}
                 />
               </div>
@@ -280,3 +285,4 @@ export default function CalendarClient({ posts, userRole }: Props) {
     </div>
   )
 }
+

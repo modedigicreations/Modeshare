@@ -1,6 +1,7 @@
 export type UserRole = 'creator' | 'approver' | 'admin' | 'super_admin'
 export type Tone = 'professional' | 'casual' | 'witty' | 'informative' | 'inspirational'
 export type Platform = 'facebook' | 'twitter' | 'linkedin'
+export type FacebookProvider = 'buffer' | 'facebook_api'
 export type BriefStatus = 'pending_generation' | 'generated' | 'in_review' | 'approved' | 'rejected'
 export type PostStatus = 'pending_review' | 'approved' | 'rejected' | 'scheduled' | 'published'
 
@@ -10,6 +11,7 @@ export interface Profile {
   full_name: string | null
   role: UserRole
   avatar_url: string | null
+  facebook_provider?: FacebookProvider
   created_at: string
   updated_at: string
 }
@@ -43,6 +45,8 @@ export interface Post {
   scheduled_at: string | null
   published_at: string | null
   buffer_post_id: string | null
+  facebook_post_id?: string | null
+  published_provider?: FacebookProvider | null
   metrics?: {
     reactions?: number
     clicks?: number
@@ -71,6 +75,17 @@ export interface BufferConnection {
   updated_at: string
 }
 
+export interface FacebookConnection {
+  id: string
+  user_id: string
+  access_token: string
+  page_id: string
+  page_name: string | null
+  page_access_token: string
+  connected_at: string
+  updated_at: string
+}
+
 // API response wrappers
 export interface ApiSuccess<T> {
   data: T
@@ -83,3 +98,4 @@ export interface ApiError {
 }
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiError
+

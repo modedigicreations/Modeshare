@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   full_name   TEXT,
   role        TEXT NOT NULL DEFAULT 'creator' CHECK (role IN ('creator', 'approver', 'admin', 'super_admin')),
   avatar_url  TEXT,
+  facebook_provider TEXT NOT NULL DEFAULT 'buffer' CHECK (facebook_provider IN ('buffer', 'facebook_api')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -57,22 +58,24 @@ CREATE TABLE IF NOT EXISTS public.briefs (
 -- GENERATED POSTS (AI-generated post variants per platform)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.posts (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  brief_id        UUID NOT NULL REFERENCES public.briefs(id) ON DELETE CASCADE,
-  user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  platform        TEXT NOT NULL CHECK (platform IN ('facebook', 'twitter', 'linkedin')),
-  variant_index   INTEGER NOT NULL DEFAULT 1 CHECK (variant_index BETWEEN 1 AND 3),
-  content         TEXT NOT NULL,
-  status          TEXT NOT NULL DEFAULT 'pending_review' CHECK (status IN ('pending_review', 'approved', 'rejected', 'scheduled', 'published')),
-  reviewed_by     UUID REFERENCES public.profiles(id),
-  reviewed_at     TIMESTAMPTZ,
-  reviewer_note   TEXT,
-  scheduled_at    TIMESTAMPTZ,
-  published_at    TIMESTAMPTZ,
-  buffer_post_id  TEXT,   -- ID returned by Buffer after scheduling
-  metrics         JSONB NOT NULL DEFAULT '{}',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  brief_id            UUID NOT NULL REFERENCES public.briefs(id) ON DELETE CASCADE,
+  user_id             UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  platform            TEXT NOT NULL CHECK (platform IN ('facebook', 'twitter', 'linkedin')),
+  variant_index       INTEGER NOT NULL DEFAULT 1 CHECK (variant_index BETWEEN 1 AND 3),
+  content             TEXT NOT NULL,
+  status              TEXT NOT NULL DEFAULT 'pending_review' CHECK (status IN ('pending_review', 'approved', 'rejected', 'scheduled', 'published')),
+  reviewed_by         UUID REFERENCES public.profiles(id),
+  reviewed_at         TIMESTAMPTZ,
+  reviewer_note       TEXT,
+  scheduled_at        TIMESTAMPTZ,
+  published_at        TIMESTAMPTZ,
+  buffer_post_id      TEXT,   -- ID returned by Buffer after scheduling
+  facebook_post_id    TEXT,   -- ID returned by Facebook Graph API after scheduling/publishing
+  published_provider  TEXT CHECK (published_provider IN ('buffer', 'facebook_api')),
+  metrics             JSONB NOT NULL DEFAULT '{}',
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================
@@ -85,6 +88,21 @@ CREATE TABLE IF NOT EXISTS public.buffer_connections (
   profile_ids     JSONB NOT NULL DEFAULT '{}',  -- { facebook: "id", twitter: "id", linkedin: "id" }
   connected_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- ============================================================
+-- FACEBOOK CONNECTIONS (store Meta Graph API access tokens & Page per user)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.facebook_connections (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id             UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  access_token        TEXT NOT NULL,
+  page_id             TEXT NOT NULL,
+  page_name           TEXT,
+  page_access_token   TEXT NOT NULL,
+  connected_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(user_id)
 );
 
@@ -119,6 +137,11 @@ CREATE TRIGGER buffer_connections_updated_at
   BEFORE UPDATE ON public.buffer_connections
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS facebook_connections_updated_at ON public.facebook_connections;
+CREATE TRIGGER facebook_connections_updated_at
+  BEFORE UPDATE ON public.facebook_connections
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
@@ -127,6 +150,7 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.briefs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.buffer_connections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.facebook_connections ENABLE ROW LEVEL SECURITY;
 
 -- SECURITY DEFINER Helper to check roles without infinite RLS recursion
 CREATE OR REPLACE FUNCTION public.is_admin_or_approver()
@@ -214,6 +238,7 @@ DROP POLICY IF EXISTS "posts_update_approver" ON public.posts;
 CREATE POLICY "posts_update_approver" ON public.posts
   FOR UPDATE USING ( public.is_admin_or_approver() );
 
+-- Buffer connections
 DROP POLICY IF EXISTS "buffer_select_own" ON public.buffer_connections;
 CREATE POLICY "buffer_select_own" ON public.buffer_connections
   FOR SELECT USING (auth.uid() = user_id);
@@ -230,6 +255,31 @@ DROP POLICY IF EXISTS "buffer_update_own" ON public.buffer_connections;
 CREATE POLICY "buffer_update_own" ON public.buffer_connections
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "buffer_delete_own" ON public.buffer_connections;
+CREATE POLICY "buffer_delete_own" ON public.buffer_connections
+  FOR DELETE USING (auth.uid() = user_id);
+
+-- Facebook connections
+DROP POLICY IF EXISTS "facebook_select_own" ON public.facebook_connections;
+CREATE POLICY "facebook_select_own" ON public.facebook_connections
+  FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "facebook_select_team" ON public.facebook_connections;
+CREATE POLICY "facebook_select_team" ON public.facebook_connections
+  FOR SELECT USING ( public.is_admin_or_approver() );
+
+DROP POLICY IF EXISTS "facebook_insert_own" ON public.facebook_connections;
+CREATE POLICY "facebook_insert_own" ON public.facebook_connections
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "facebook_update_own" ON public.facebook_connections;
+CREATE POLICY "facebook_update_own" ON public.facebook_connections
+  FOR UPDATE USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "facebook_delete_own" ON public.facebook_connections;
+CREATE POLICY "facebook_delete_own" ON public.facebook_connections
+  FOR DELETE USING (auth.uid() = user_id);
+
 -- ============================================================
 -- INDEXES
 -- ============================================================
@@ -241,3 +291,5 @@ CREATE INDEX IF NOT EXISTS idx_posts_status ON public.posts(status);
 CREATE INDEX IF NOT EXISTS idx_posts_platform ON public.posts(platform);
 CREATE INDEX IF NOT EXISTS idx_posts_scheduled_at ON public.posts(scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_posts_buffer_post_id ON public.posts(buffer_post_id);
+CREATE INDEX IF NOT EXISTS idx_posts_facebook_post_id ON public.posts(facebook_post_id);
+CREATE INDEX IF NOT EXISTS idx_facebook_connections_user_id ON public.facebook_connections(user_id);

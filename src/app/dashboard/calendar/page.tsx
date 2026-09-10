@@ -14,7 +14,7 @@ export default async function CalendarPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, facebook_provider')
     .eq('id', user.id)
     .single()
 
@@ -42,7 +42,9 @@ export default async function CalendarPage() {
       <CalendarClient
         posts={(posts as (Post & { brief: { topic: string } })[]) || []}
         userRole={profile?.role as UserRole}
+        facebookProvider={profile?.facebook_provider}
       />
     </div>
   )
 }
+

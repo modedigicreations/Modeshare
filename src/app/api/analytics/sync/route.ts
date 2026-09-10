@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getPostMetrics } from '@/lib/buffer'
+import { getPostMetrics as getBufferPostMetrics } from '@/lib/buffer'
+import { getFacebookPostMetrics } from '@/lib/facebook'
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,11 +17,11 @@ export async function POST(request: NextRequest) {
 
     const isSuperAdmin = profile?.role === 'super_admin'
 
-    // Fetch posts that have been pushed to Buffer
+    // Fetch posts that have been pushed to Buffer or Facebook
     let postsQuery = supabase
       .from('posts')
-      .select('id, user_id, buffer_post_id')
-      .not('buffer_post_id', 'is', null)
+      .select('id, user_id, buffer_post_id, facebook_post_id, published_provider')
+      .or('buffer_post_id.not.is.null,facebook_post_id.not.is.null')
 
     if (!isSuperAdmin) {
       postsQuery = postsQuery.eq('user_id', user.id)
@@ -34,29 +35,52 @@ export async function POST(request: NextRequest) {
     let syncedCount = 0
     const syncErrors: Record<string, string> = {}
 
-    // Group posts by user_id to cache buffer connections (saves DB query overhead)
+    // Group posts by user_id to cache connections
     const userIds = Array.from(new Set(posts.map((p) => p.user_id)))
-    const connectionsMap: Record<string, string> = {}
+    const bufferConnectionsMap: Record<string, string> = {}
+    const facebookConnectionsMap: Record<string, string> = {}
 
     for (const uid of userIds) {
-      const { data: conn } = await supabase
-        .from('buffer_connections')
-        .select('access_token')
-        .eq('user_id', uid)
-        .single()
-      if (conn?.access_token) {
-        connectionsMap[uid] = conn.access_token
+      const [bufferRes, fbRes] = await Promise.all([
+        supabase
+          .from('buffer_connections')
+          .select('access_token')
+          .eq('user_id', uid)
+          .single(),
+        supabase
+          .from('facebook_connections')
+          .select('page_access_token')
+          .eq('user_id', uid)
+          .single(),
+      ])
+
+      if (bufferRes.data?.access_token) {
+        bufferConnectionsMap[uid] = bufferRes.data.access_token
+      }
+      if (fbRes.data?.page_access_token) {
+        facebookConnectionsMap[uid] = fbRes.data.page_access_token
       }
     }
 
     // Perform concurrent metrics sync
     await Promise.allSettled(
       posts.map(async (post) => {
-        const token = connectionsMap[post.user_id]
-        if (!token || !post.buffer_post_id) return
-
         try {
-          const stats = await getPostMetrics(token, post.buffer_post_id)
+          let stats = { reactions: 0, clicks: 0, reposts: 0, comments: 0 }
+
+          if (post.facebook_post_id) {
+            const fbToken = facebookConnectionsMap[post.user_id]
+            if (fbToken) {
+              stats = await getFacebookPostMetrics(fbToken, post.facebook_post_id)
+            }
+          } else if (post.buffer_post_id) {
+            const bufferToken = bufferConnectionsMap[post.user_id]
+            if (bufferToken) {
+              stats = await getBufferPostMetrics(bufferToken, post.buffer_post_id)
+            }
+          } else {
+            return
+          }
 
           await supabase
             .from('posts')
@@ -85,3 +109,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+

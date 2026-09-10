@@ -3,9 +3,12 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
-import { Settings, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
+import { Settings, CheckCircle2, AlertCircle, ExternalLink, Sliders } from 'lucide-react'
 import BufferConnectButton from './BufferConnectButton'
+import FacebookConnectCard from './FacebookConnectCard'
+import ProviderToggle from './ProviderToggle'
 import RoleSwitcher from './RoleSwitcher'
+import { FacebookProvider } from '@/types/database'
 
 export const metadata = { title: 'Settings — Modeshare' }
 
@@ -30,6 +33,12 @@ export default async function SettingsPage({ searchParams }: Props) {
     .eq('user_id', user.id)
     .single()
 
+  const { data: facebookConn } = await supabase
+    .from('facebook_connections')
+    .select('page_id, page_name, connected_at')
+    .eq('user_id', user.id)
+    .single()
+
   const params = await searchParams
   const bufferAuthUrl = '/api/buffer/connect'
 
@@ -43,6 +52,11 @@ export default async function SettingsPage({ searchParams }: Props) {
     linkedin: 'LinkedIn',
   }
 
+  const hasBuffer = !!bufferConn
+  const hasFacebook = !!facebookConn
+  const currentProvider = (profile?.facebook_provider as FacebookProvider) || 'buffer'
+  const isFbConfigured = !!(process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET)
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -51,7 +65,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         </div>
         <div>
           <h1 className="text-xl font-bold text-gray-900">Settings</h1>
-          <p className="text-sm text-gray-500">Manage your account and integrations</p>
+          <p className="text-sm text-gray-500">Manage your account and social integrations</p>
         </div>
       </div>
 
@@ -60,6 +74,12 @@ export default async function SettingsPage({ searchParams }: Props) {
         <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3">
           <CheckCircle2 size={16} />
           Buffer connected successfully!
+        </div>
+      )}
+      {params.success === 'facebook_connected' && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3">
+          <CheckCircle2 size={16} />
+          Facebook Page connected successfully!
         </div>
       )}
       {params.error && (
@@ -71,7 +91,13 @@ export default async function SettingsPage({ searchParams }: Props) {
                 ? 'Buffer authorization failed. Please try again.'
                 : params.error === 'buffer_callback_failed'
                   ? 'Could not complete Buffer connection. Check your credentials.'
-                  : params.error}
+                  : params.error === 'facebook_auth_failed'
+                    ? 'Facebook authorization failed. Please try again.'
+                    : params.error === 'facebook_no_pages'
+                      ? 'No Facebook Pages found. You need to administer at least one Page.'
+                      : params.error === 'facebook_callback_failed'
+                        ? 'Could not complete Facebook connection.'
+                        : params.error}
             </span>
           </div>
           {params.details && (
@@ -103,6 +129,39 @@ export default async function SettingsPage({ searchParams }: Props) {
         </CardBody>
       </Card>
 
+      {/* Facebook Publishing Mode Toggle */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Sliders size={18} />
+            </div>
+            <div>
+              <h2 className="font-semibold text-gray-800">Facebook Scheduling Provider</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Toggle whether Facebook posts are scheduled via Buffer or direct Facebook API
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <ProviderToggle
+            initialProvider={currentProvider}
+            hasBuffer={hasBuffer}
+            hasFacebook={hasFacebook}
+          />
+        </CardBody>
+      </Card>
+
+      {/* Direct Facebook API Integration */}
+      <FacebookConnectCard
+        isConnected={hasFacebook}
+        pageName={facebookConn?.page_name || null}
+        pageId={facebookConn?.page_id || null}
+        connectedAt={facebookConn?.connected_at || null}
+        appIdConfigured={isFbConfigured}
+      />
+
       {/* Buffer integration */}
       <Card>
         <CardHeader>
@@ -110,7 +169,7 @@ export default async function SettingsPage({ searchParams }: Props) {
             <div>
               <h2 className="font-semibold text-gray-800">Buffer Integration</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Connect your Buffer account to publish posts to social media
+                Connect your Buffer account to publish posts to Twitter/X, LinkedIn, and Facebook
               </p>
             </div>
             {bufferConn ? (
@@ -181,7 +240,7 @@ export default async function SettingsPage({ searchParams }: Props) {
                     {!process.env.BUFFER_REDIRECT_URI && <li>`BUFFER_REDIRECT_URI` is not set</li>}
                   </ul>
                   <p className="mt-1 text-[10px] text-red-500">
-                    Configure these variables in your `.env.local` or Railway settings to enable Buffer connection.
+                    Configure these variables in your `.env.local` or deployment settings to enable Buffer connection.
                   </p>
                 </div>
               ) : (
