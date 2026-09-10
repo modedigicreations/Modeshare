@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { rewritePost } from '@/lib/deepseek'
 import { scheduleBufferPost } from '@/lib/buffer'
+import { scheduleFacebookPost } from '@/lib/facebook'
 import { Platform } from '@/types/database'
 
 const updateSchema = z.discriminatedUnion('action', [
@@ -39,7 +40,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Only approvers/admins can act on posts
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, facebook_provider')
       .eq('id', user.id)
       .single()
 
@@ -113,54 +114,106 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       let autoScheduled = false
       let autoScheduleError: string | null = null
       let bufferId: string | null = null
+      let facebookPostId: string | null = null
 
       try {
-        let { data: bufferConn } = await supabase
-          .from('buffer_connections')
-          .select('*')
-          .eq('user_id', user.id)
-          .single()
-
         const platform = post.platform as Platform
-        let profileId = bufferConn
-          ? (bufferConn.profile_ids as Record<string, string>)[platform]
-          : undefined
+        const currentFbProvider = profile?.facebook_provider || 'buffer'
 
-        if (!profileId) {
-          const { data: authorConn } = await supabase
+        if (platform === 'facebook' && currentFbProvider === 'facebook_api') {
+          // Direct Facebook API Auto-Scheduling on Approval
+          let { data: fbConn } = await supabase
+            .from('facebook_connections')
+            .select('*')
+            .eq('user_id', user.id)
+            .single()
+
+          if (!fbConn) {
+            const { data: authorConn } = await supabase
+              .from('facebook_connections')
+              .select('*')
+              .eq('user_id', post.user_id)
+              .single()
+            if (authorConn) fbConn = authorConn
+          }
+
+          if (fbConn && fbConn.page_access_token && fbConn.page_id) {
+            const fbResult = await scheduleFacebookPost(
+              fbConn.page_access_token,
+              fbConn.page_id,
+              post.content,
+              post.scheduled_at
+            )
+
+            facebookPostId = fbResult.id
+
+            const { data: updatedPost, error: updateErr } = await supabase
+              .from('posts')
+              .update({
+                status: fbResult.isScheduled ? 'scheduled' : 'published',
+                facebook_post_id: facebookPostId,
+                published_provider: 'facebook_api',
+                scheduled_at: post.scheduled_at || new Date().toISOString(),
+                published_at: fbResult.isScheduled ? null : new Date().toISOString(),
+              })
+              .eq('id', id)
+              .select()
+              .single()
+
+            if (!updateErr && updatedPost) {
+              post = updatedPost
+              autoScheduled = true
+            }
+          }
+        } else {
+          // Buffer Auto-Scheduling
+          let { data: bufferConn } = await supabase
             .from('buffer_connections')
             .select('*')
-            .eq('user_id', post.user_id)
+            .eq('user_id', user.id)
             .single()
-          if (authorConn) {
-            bufferConn = authorConn
-            profileId = (authorConn.profile_ids as Record<string, string>)[platform]
+
+          let profileId = bufferConn
+            ? (bufferConn.profile_ids as Record<string, string>)[platform]
+            : undefined
+
+          if (!profileId) {
+            const { data: authorConn } = await supabase
+              .from('buffer_connections')
+              .select('*')
+              .eq('user_id', post.user_id)
+              .single()
+            if (authorConn) {
+              bufferConn = authorConn
+              profileId = (authorConn.profile_ids as Record<string, string>)[platform]
+            }
           }
-        }
 
-        if (profileId && bufferConn) {
-          bufferId = await scheduleBufferPost(
-            bufferConn.access_token,
-            profileId,
-            post.content,
-            post.scheduled_at,
-            platform
-          )
+          if (profileId && bufferConn) {
+            bufferId = await scheduleBufferPost(
+              bufferConn.access_token,
+              profileId,
+              post.content,
+              post.scheduled_at,
+              platform
+            )
 
-          const { data: updatedPost, error: updateErr } = await supabase
-            .from('posts')
-            .update({
-              status: 'scheduled',
-              buffer_post_id: bufferId,
-              scheduled_at: post.scheduled_at || new Date().toISOString(),
-            })
-            .eq('id', id)
-            .select()
-            .single()
+            const { data: updatedPost, error: updateErr } = await supabase
+              .from('posts')
+              .update({
+                status: 'scheduled',
+                buffer_post_id: bufferId,
+                published_provider: 'buffer',
+                scheduled_at: post.scheduled_at || new Date().toISOString(),
+              })
+              .eq('id', id)
+              .select()
+              .single()
 
-          if (!updateErr && updatedPost) {
-            post = updatedPost
-            autoScheduled = true
+            if (!updateErr && updatedPost) {
+              post = updatedPost
+              autoScheduled = true
+            }
           }
         }
       } catch (err) {
