@@ -1,11 +1,21 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getFacebookAuthUrl } from '@/lib/facebook'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+function getRequestOrigin(request: NextRequest): string {
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
+  const proto = request.headers.get('x-forwarded-proto') || 'https'
+  if (host) {
+    return `${proto}://${host}`
+  }
+  return new URL(request.url).origin
+}
+
+export async function GET(request: NextRequest) {
+  const origin = getRequestOrigin(request)
   const state = crypto.randomBytes(16).toString('hex')
   const cookieStore = await cookies()
 
@@ -18,6 +28,6 @@ export async function GET() {
     maxAge: 600, // 10 minutes
   })
 
-  const authUrl = getFacebookAuthUrl(state)
+  const authUrl = getFacebookAuthUrl(state, origin)
   return NextResponse.redirect(authUrl)
 }

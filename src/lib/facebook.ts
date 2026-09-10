@@ -18,9 +18,13 @@ export interface FacebookPostMetrics {
 /**
  * Generate Facebook OAuth authorization URL
  */
-export function getFacebookAuthUrl(state: string): string {
-  const clientId = (process.env.FACEBOOK_APP_ID || '').trim()
-  const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || '').trim()
+export function getFacebookAuthUrl(state: string, requestOrigin?: string): string {
+  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
+  let redirectUri = (process.env.FACEBOOK_REDIRECT_URI || '').trim()
+  if (!redirectUri && requestOrigin) {
+    redirectUri = `${requestOrigin}/api/facebook/callback`
+  }
+
   const scopes = [
     'pages_show_list',
     'pages_read_engagement',
@@ -42,13 +46,16 @@ export function getFacebookAuthUrl(state: string): string {
 /**
  * Exchange auth code for user access token and upgrade to a long-lived user token (60-day expiry)
  */
-export async function exchangeFacebookCode(code: string): Promise<string> {
-  const clientId = (process.env.FACEBOOK_APP_ID || '').trim()
+export async function exchangeFacebookCode(code: string, requestOrigin?: string): Promise<string> {
+  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
   const clientSecret = (process.env.FACEBOOK_APP_SECRET || '').trim()
-  const redirectUri = (process.env.FACEBOOK_REDIRECT_URI || '').trim()
+  let redirectUri = (process.env.FACEBOOK_REDIRECT_URI || '').trim()
+  if (!redirectUri && requestOrigin) {
+    redirectUri = `${requestOrigin}/api/facebook/callback`
+  }
 
   if (!clientId || !clientSecret || !redirectUri) {
-    throw new Error('Facebook App credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET, FACEBOOK_REDIRECT_URI) are not configured')
+    throw new Error('Facebook App credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET) are not configured')
   }
 
   // 1. Get short-lived token
@@ -57,6 +64,7 @@ export async function exchangeFacebookCode(code: string): Promise<string> {
   tokenUrl.searchParams.set('client_secret', clientSecret)
   tokenUrl.searchParams.set('redirect_uri', redirectUri)
   tokenUrl.searchParams.set('code', code)
+
 
   const res = await fetch(tokenUrl.toString(), { method: 'GET' })
   if (!res.ok) {

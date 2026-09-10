@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 1. Exchange code for long-lived user access token
-    const userAccessToken = await exchangeFacebookCode(code)
+    const userAccessToken = await exchangeFacebookCode(code, origin)
+
 
     // 2. Fetch user's managed Facebook Pages
     const pages = await getFacebookPages(userAccessToken)
