@@ -51,12 +51,29 @@ export default function FacebookConnectCard({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [, startTransition] = useTransition()
 
+  const [configId, setConfigId] = useState('')
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setOrigin(window.location.origin)
+      const savedConfig = localStorage.getItem('modeshare_fb_config_id')
+      if (savedConfig) {
+        setConfigId(savedConfig)
+      }
     }
   }, [])
 
+  function handleConfigIdChange(val: string) {
+    const trimmed = val.trim()
+    setConfigId(trimmed)
+    if (typeof window !== 'undefined') {
+      if (trimmed) {
+        localStorage.setItem('modeshare_fb_config_id', trimmed)
+      } else {
+        localStorage.removeItem('modeshare_fb_config_id')
+      }
+    }
+  }
 
   useEffect(() => {
     if (isConnected) {
@@ -126,9 +143,9 @@ export default function FacebookConnectCard({
     }, 10000)
 
     try {
-      const configId = process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || ''
-      const loginOptions = configId
-        ? { config_id: configId }
+      const activeConfigId = configId || process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || ''
+      const loginOptions = activeConfigId
+        ? { config_id: activeConfigId }
         : {
             scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,public_profile',
             return_scopes: true,
@@ -163,14 +180,20 @@ export default function FacebookConnectCard({
         )
       } else {
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
-        window.location.href = '/api/facebook/connect'
+        const connectUrl = activeConfigId
+          ? `/api/facebook/connect?config_id=${encodeURIComponent(activeConfigId)}`
+          : '/api/facebook/connect'
+        window.location.href = connectUrl
       }
     } catch (err) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       setConnecting(false)
-      window.location.href = '/api/facebook/connect'
+      const activeConfigId = configId || process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || ''
+      const connectUrl = activeConfigId
+        ? `/api/facebook/connect?config_id=${encodeURIComponent(activeConfigId)}`
+        : '/api/facebook/connect'
+      window.location.href = connectUrl
     }
-
   }
 
   async function handleDisconnect() {
@@ -273,7 +296,7 @@ export default function FacebookConnectCard({
 
             <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
               <a
-                href="/api/facebook/connect"
+                href={configId ? `/api/facebook/connect?config_id=${encodeURIComponent(configId)}` : '/api/facebook/connect'}
                 className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 Reconnect or switch account
@@ -320,6 +343,25 @@ export default function FacebookConnectCard({
               </div>
             ) : (
               <div className="space-y-3 pt-1">
+                <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-3 text-xs text-amber-900 space-y-2">
+                  <div className="font-semibold flex items-center justify-between text-amber-900">
+                    <span>Login Configuration ID (For Business Apps):</span>
+                    <span className="text-[10px] bg-amber-200/70 px-1.5 py-0.5 rounded font-mono">Meta Business Login</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Meta Business Apps require a <strong>Configuration ID</strong>. In Meta Developers, go to:
+                    <br />
+                    <span className="font-medium">Facebook Login for Business &rarr; Configurations</span> &rarr; copy your numeric Configuration ID and paste it below:
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="e.g. 109283746592019 (Configuration ID)"
+                    value={configId}
+                    onChange={(e) => handleConfigIdChange(e.target.value)}
+                    className="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+
                 <button
                   type="button"
                   onClick={handleConnectSdk}
@@ -342,7 +384,7 @@ export default function FacebookConnectCard({
 
                 <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-1.5">
                   <div className="font-semibold text-gray-800 flex items-center justify-between">
-                    <span>Required Redirect URI for Meta Console:</span>
+                    <span>Required Redirect URI in Meta Console:</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -362,14 +404,13 @@ export default function FacebookConnectCard({
 
                 <div className="text-center pt-0.5">
                   <a
-                    href="/api/facebook/connect"
+                    href={configId ? `/api/facebook/connect?config_id=${encodeURIComponent(configId)}` : '/api/facebook/connect'}
                     className="text-xs text-gray-500 hover:text-blue-600 font-medium inline-flex items-center gap-1 transition"
                   >
                     Direct OAuth Redirect Link <ArrowRight size={11} />
                   </a>
                 </div>
               </div>
-
             )}
           </div>
         )}

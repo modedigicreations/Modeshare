@@ -47,10 +47,10 @@ export function resolveFacebookRedirectUri(requestOrigin?: string): string {
 /**
  * Generate Facebook OAuth authorization URL
  */
-export function getFacebookAuthUrl(state: string, requestOrigin?: string): string {
+export function getFacebookAuthUrl(state: string, requestOrigin?: string, explicitConfigId?: string): string {
   const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
   const redirectUri = resolveFacebookRedirectUri(requestOrigin)
-  const configId = (process.env.FACEBOOK_CONFIG_ID || process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || '').trim()
+  const configId = (explicitConfigId || process.env.FACEBOOK_CONFIG_ID || process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || '').trim()
 
   const params = new URLSearchParams({
     client_id: clientId,

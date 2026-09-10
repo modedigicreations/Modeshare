@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
   const origin = getRequestOrigin(request)
   const state = crypto.randomBytes(16).toString('hex')
   const cookieStore = await cookies()
+  const configId = request.nextUrl.searchParams.get('config_id') || undefined
 
   // Store the state in a secure, HTTP-only cookie for CSRF verification during callback
   cookieStore.set('facebook_oauth_state', state, {
@@ -28,6 +29,6 @@ export async function GET(request: NextRequest) {
     maxAge: 600, // 10 minutes
   })
 
-  const authUrl = getFacebookAuthUrl(state, origin)
+  const authUrl = getFacebookAuthUrl(state, origin, configId)
   return NextResponse.redirect(authUrl)
 }
