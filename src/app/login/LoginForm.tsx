@@ -7,7 +7,9 @@ import { loginAction, signupAction } from '@/app/auth/actions'
 
 export default function LoginForm() {
   const searchParams = useSearchParams()
-  const urlError = searchParams.get('error')
+  const rawUrlError = searchParams.get('error')
+  const isGenericSessionError = rawUrlError?.includes('session missing') || rawUrlError?.includes('No user session')
+  const urlError = isGenericSessionError ? null : rawUrlError
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)

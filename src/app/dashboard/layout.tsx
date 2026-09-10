@@ -17,7 +17,7 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/login?error=' + encodeURIComponent(`Auth error in DashboardLayout: ${authError?.message || 'No user session'}`))
+    redirect('/login')
   }
 
   const { data: initialProfile, error: profileError } = await supabase
