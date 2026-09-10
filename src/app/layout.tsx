@@ -24,28 +24,30 @@ export default function RootLayout({
     >
       <body className="h-full">
         {children}
-        <Script id="facebook-jssdk-init" strategy="afterInteractive">
-          {`
-            window.fbAsyncInit = function() {
-              FB.init({
-                appId      : '${fbAppId}',
-                cookie     : true,
-                xfbml      : true,
-                version    : '${fbApiVersion}'
-              });
-                
-              FB.AppEvents.logPageView();   
-            };
+        {fbAppId && (
+          <Script id="facebook-jssdk-init" strategy="afterInteractive">
+            {`
+              window.fbAsyncInit = function() {
+                FB.init({
+                  appId      : '${fbAppId}',
+                  cookie     : true,
+                  xfbml      : true,
+                  version    : '${fbApiVersion}'
+                });
+                  
+                FB.AppEvents.logPageView();   
+              };
 
-            (function(d, s, id){
-               var js, fjs = d.getElementsByTagName(s)[0];
-               if (d.getElementById(id)) {return;}
-               js = d.createElement(s); js.id = id;
-               js.src = "https://connect.facebook.net/en_US/sdk.js";
-               fjs.parentNode.insertBefore(js, fjs);
-             }(document, 'script', 'facebook-jssdk'));
-          `}
-        </Script>
+              (function(d, s, id){
+                 var js, fjs = d.getElementsByTagName(s)[0];
+                 if (d.getElementById(id)) {return;}
+                 js = d.createElement(s); js.id = id;
+                 js.src = "https://connect.facebook.net/en_US/sdk.js";
+                 fjs.parentNode.insertBefore(js, fjs);
+               }(document, 'script', 'facebook-jssdk'));
+            `}
+          </Script>
+        )}
       </body>
     </html>
   )

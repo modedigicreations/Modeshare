@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useTransition, useRef } from 'react'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import FacebookIcon from '@/components/ui/FacebookIcon'
-import { CheckCircle2, AlertCircle, ExternalLink, RefreshCw, Trash2 } from 'lucide-react'
+import { CheckCircle2, AlertCircle, ExternalLink, RefreshCw, Trash2, ArrowRight } from 'lucide-react'
 
 declare global {
   interface Window {
@@ -46,11 +46,15 @@ export default function FacebookConnectCard({
   const [selectedPageId, setSelectedPageId] = useState<string>(pageId || '')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [, startTransition] = useTransition()
 
   useEffect(() => {
     if (isConnected) {
       fetchPages()
+    }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
     }
   }, [isConnected])
 
@@ -101,42 +105,55 @@ export default function FacebookConnectCard({
     }
   }
 
-  async function handleConnect() {
+  async function handleConnectSdk() {
     setError(null)
     setConnecting(true)
 
-    // Try Facebook JavaScript SDK Popup first if available
-    if (typeof window !== 'undefined' && window.FB) {
-      window.FB.login(
-        async (response) => {
-          if (response.authResponse?.accessToken) {
-            try {
-              const res = await fetch('/api/facebook/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ accessToken: response.authResponse.accessToken }),
-              })
+    // Set a safety timeout of 10s in case the popup was blocked by browser or closed without response
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    timeoutRef.current = setTimeout(() => {
+      setConnecting(false)
+      setError('Popup was closed or blocked by your browser. You can click "Direct OAuth Login" below instead.')
+    }, 10000)
 
-              const data = await res.json()
-              if (!res.ok) throw new Error(data.error || 'Failed to link Facebook account')
+    try {
+      if (typeof window !== 'undefined' && window.FB) {
+        window.FB.login(
+          async (response) => {
+            if (timeoutRef.current) clearTimeout(timeoutRef.current)
+            if (response.authResponse?.accessToken) {
+              try {
+                const res = await fetch('/api/facebook/token', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ accessToken: response.authResponse.accessToken }),
+                })
 
-              window.location.reload()
-            } catch (err) {
-              setError(err instanceof Error ? err.message : 'Failed to save Facebook connection')
+                const data = await res.json()
+                if (!res.ok) throw new Error(data.error || 'Failed to link Facebook account')
+
+                window.location.reload()
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to save Facebook connection')
+                setConnecting(false)
+              }
+            } else {
+              // User closed popup or cancelled
               setConnecting(false)
             }
-          } else {
-            // User cancelled popup or denied permissions
-            setConnecting(false)
+          },
+          {
+            scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,public_profile',
+            return_scopes: true,
           }
-        },
-        {
-          scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,public_profile',
-          return_scopes: true,
-        }
-      )
-    } else {
-      // Fallback to server-side OAuth redirect
+        )
+      } else {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        window.location.href = '/api/facebook/connect'
+      }
+    } catch (err) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      setConnecting(false)
       window.location.href = '/api/facebook/connect'
     }
   }
@@ -240,14 +257,12 @@ export default function FacebookConnectCard({
             </div>
 
             <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={handleConnect}
-                disabled={connecting}
+              <a
+                href="/api/facebook/connect"
                 className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
-                {connecting ? 'Opening Facebook Login...' : 'Reconnect or switch account'}
-              </button>
+                Reconnect or switch account
+              </a>
               <Button
                 variant="ghost"
                 size="sm"
@@ -273,7 +288,7 @@ export default function FacebookConnectCard({
             {error && (
               <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 <AlertCircle size={14} className="shrink-0" />
-                {error}
+                <span>{error}</span>
               </div>
             )}
 
@@ -281,7 +296,7 @@ export default function FacebookConnectCard({
               <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-700 space-y-1">
                 <p className="font-semibold">Facebook Configuration Missing:</p>
                 <ul className="list-disc pl-4 space-y-0.5">
-                  <li>`FACEBOOK_APP_ID` / `NEXT_PUBLIC_FACEBOOK_APP_ID` is not set</li>
+                  <li>`FACEBOOK_APP_ID` is not set</li>
                   <li>`FACEBOOK_APP_SECRET` is not set</li>
                 </ul>
                 <p className="mt-1 text-[10px] text-red-500">
@@ -289,33 +304,33 @@ export default function FacebookConnectCard({
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 pt-1">
                 <button
                   type="button"
-                  onClick={handleConnect}
+                  onClick={handleConnectSdk}
                   disabled={connecting}
-                  className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm cursor-pointer disabled:opacity-75"
                 >
                   {connecting ? (
                     <>
-                      <RefreshCw size={16} className="animate-spin" />
+                      <RefreshCw size={15} className="animate-spin" />
                       Connecting Facebook...
                     </>
                   ) : (
                     <>
                       <FacebookIcon size={16} />
-                      Connect Facebook Page
+                      Connect Facebook Page (Popup)
                       <ExternalLink size={13} className="opacity-80" />
                     </>
                   )}
                 </button>
 
-                <div className="text-center">
+                <div className="pt-1 flex items-center justify-center">
                   <a
                     href="/api/facebook/connect"
-                    className="text-[11px] text-gray-400 hover:text-gray-600 underline"
+                    className="text-xs text-gray-500 hover:text-blue-600 font-medium inline-flex items-center gap-1 transition"
                   >
-                    Or use direct OAuth redirect link
+                    Direct OAuth Redirect Login <ArrowRight size={11} />
                   </a>
                 </div>
               </div>
