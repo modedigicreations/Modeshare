@@ -16,14 +16,40 @@ export interface FacebookPostMetrics {
 }
 
 /**
+ * Resolve the canonical Facebook OAuth redirect URI ensuring HTTPS in production
+ */
+export function resolveFacebookRedirectUri(requestOrigin?: string): string {
+  let redirectUri = (process.env.FACEBOOK_REDIRECT_URI || '').trim()
+  if (redirectUri) {
+    return redirectUri
+  }
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
+  if (appUrl) {
+    let canonical = appUrl
+    if (!canonical.includes('localhost') && !canonical.includes('127.0.0.1')) {
+      canonical = canonical.replace(/^http:\/\//i, 'https://')
+    }
+    return `${canonical}/api/facebook/callback`
+  }
+
+  if (requestOrigin) {
+    let origin = requestOrigin.trim().replace(/\/+$/, '')
+    if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+      origin = origin.replace(/^http:\/\//i, 'https://')
+    }
+    return `${origin}/api/facebook/callback`
+  }
+
+  return 'https://modeshare.net/api/facebook/callback'
+}
+
+/**
  * Generate Facebook OAuth authorization URL
  */
 export function getFacebookAuthUrl(state: string, requestOrigin?: string): string {
   const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
-  let redirectUri = (process.env.FACEBOOK_REDIRECT_URI || '').trim()
-  if (!redirectUri && requestOrigin) {
-    redirectUri = `${requestOrigin}/api/facebook/callback`
-  }
+  const redirectUri = resolveFacebookRedirectUri(requestOrigin)
 
   const scopes = [
     'pages_show_list',
@@ -44,17 +70,40 @@ export function getFacebookAuthUrl(state: string, requestOrigin?: string): strin
 }
 
 /**
+ * Upgrade short-lived token to long-lived 60-day token
+ */
+export async function upgradeToLongLivedToken(shortLivedToken: string): Promise<string> {
+  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
+  const clientSecret = (process.env.FACEBOOK_APP_SECRET || '').trim()
+
+  if (!clientId || !clientSecret) {
+    return shortLivedToken
+  }
+
+  const exchangeUrl = new URL(`${FB_GRAPH_BASE}/oauth/access_token`)
+  exchangeUrl.searchParams.set('grant_type', 'fb_exchange_token')
+  exchangeUrl.searchParams.set('client_id', clientId)
+  exchangeUrl.searchParams.set('client_secret', clientSecret)
+  exchangeUrl.searchParams.set('fb_exchange_token', shortLivedToken)
+
+  const longLivedRes = await fetch(exchangeUrl.toString(), { method: 'GET' })
+  if (!longLivedRes.ok) {
+    return shortLivedToken
+  }
+
+  const longLivedData = await longLivedRes.json()
+  return longLivedData.access_token || shortLivedToken
+}
+
+/**
  * Exchange auth code for user access token and upgrade to a long-lived user token (60-day expiry)
  */
 export async function exchangeFacebookCode(code: string, requestOrigin?: string): Promise<string> {
   const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
   const clientSecret = (process.env.FACEBOOK_APP_SECRET || '').trim()
-  let redirectUri = (process.env.FACEBOOK_REDIRECT_URI || '').trim()
-  if (!redirectUri && requestOrigin) {
-    redirectUri = `${requestOrigin}/api/facebook/callback`
-  }
+  const redirectUri = resolveFacebookRedirectUri(requestOrigin)
 
-  if (!clientId || !clientSecret || !redirectUri) {
+  if (!clientId || !clientSecret) {
     throw new Error('Facebook App credentials (FACEBOOK_APP_ID, FACEBOOK_APP_SECRET) are not configured')
   }
 
@@ -64,7 +113,6 @@ export async function exchangeFacebookCode(code: string, requestOrigin?: string)
   tokenUrl.searchParams.set('client_secret', clientSecret)
   tokenUrl.searchParams.set('redirect_uri', redirectUri)
   tokenUrl.searchParams.set('code', code)
-
 
   const res = await fetch(tokenUrl.toString(), { method: 'GET' })
   if (!res.ok) {
@@ -79,21 +127,9 @@ export async function exchangeFacebookCode(code: string, requestOrigin?: string)
   }
 
   // 2. Upgrade to long-lived token (60 days)
-  const exchangeUrl = new URL(`${FB_GRAPH_BASE}/oauth/access_token`)
-  exchangeUrl.searchParams.set('grant_type', 'fb_exchange_token')
-  exchangeUrl.searchParams.set('client_id', clientId)
-  exchangeUrl.searchParams.set('client_secret', clientSecret)
-  exchangeUrl.searchParams.set('fb_exchange_token', shortLivedToken)
-
-  const longLivedRes = await fetch(exchangeUrl.toString(), { method: 'GET' })
-  if (!longLivedRes.ok) {
-    // Fall back to short-lived token if exchange fails
-    return shortLivedToken
-  }
-
-  const longLivedData = await longLivedRes.json()
-  return longLivedData.access_token || shortLivedToken
+  return await upgradeToLongLivedToken(shortLivedToken)
 }
+
 
 /**
  * Fetch all Facebook Pages the user manages, with Page Access Tokens

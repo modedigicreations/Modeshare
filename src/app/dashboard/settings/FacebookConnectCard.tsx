@@ -6,6 +6,16 @@ import Button from '@/components/ui/Button'
 import FacebookIcon from '@/components/ui/FacebookIcon'
 import { CheckCircle2, AlertCircle, ExternalLink, RefreshCw, Trash2 } from 'lucide-react'
 
+declare global {
+  interface Window {
+    FB?: {
+      login: (
+        callback: (response: { authResponse?: { accessToken: string; userID?: string }; status: string }) => void,
+        options: { scope: string; return_scopes?: boolean }
+      ) => void
+    }
+  }
+}
 
 interface PageOption {
   id: string
@@ -31,6 +41,7 @@ export default function FacebookConnectCard({
   const [pages, setPages] = useState<PageOption[]>([])
   const [loadingPages, setLoadingPages] = useState(false)
   const [switchingPage, setSwitchingPage] = useState(false)
+  const [connecting, setConnecting] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
   const [selectedPageId, setSelectedPageId] = useState<string>(pageId || '')
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +101,46 @@ export default function FacebookConnectCard({
     }
   }
 
+  async function handleConnect() {
+    setError(null)
+    setConnecting(true)
+
+    // Try Facebook JavaScript SDK Popup first if available
+    if (typeof window !== 'undefined' && window.FB) {
+      window.FB.login(
+        async (response) => {
+          if (response.authResponse?.accessToken) {
+            try {
+              const res = await fetch('/api/facebook/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ accessToken: response.authResponse.accessToken }),
+              })
+
+              const data = await res.json()
+              if (!res.ok) throw new Error(data.error || 'Failed to link Facebook account')
+
+              window.location.reload()
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'Failed to save Facebook connection')
+              setConnecting(false)
+            }
+          } else {
+            // User cancelled popup or denied permissions
+            setConnecting(false)
+          }
+        },
+        {
+          scope: 'pages_show_list,pages_read_engagement,pages_manage_posts,public_profile',
+          return_scopes: true,
+        }
+      )
+    } else {
+      // Fallback to server-side OAuth redirect
+      window.location.href = '/api/facebook/connect'
+    }
+  }
+
   async function handleDisconnect() {
     if (!confirm('Are you sure you want to disconnect Facebook API integration?')) return
     setDisconnecting(true)
@@ -133,7 +184,6 @@ export default function FacebookConnectCard({
           )}
         </div>
       </CardHeader>
-
 
       <CardBody className="space-y-4">
         {isConnected ? (
@@ -190,12 +240,14 @@ export default function FacebookConnectCard({
             </div>
 
             <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-              <a
-                href="/api/facebook/connect"
-                className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+              <button
+                type="button"
+                onClick={handleConnect}
+                disabled={connecting}
+                className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
-                Reconnect or switch account
-              </a>
+                {connecting ? 'Opening Facebook Login...' : 'Reconnect or switch account'}
+              </button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -218,11 +270,18 @@ export default function FacebookConnectCard({
               Requires a Meta account with Administrator or Editor permissions on the target Facebook Page.
             </div>
 
+            {error && (
+              <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <AlertCircle size={14} className="shrink-0" />
+                {error}
+              </div>
+            )}
+
             {!appIdConfigured ? (
               <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-xs text-red-700 space-y-1">
                 <p className="font-semibold">Facebook Configuration Missing:</p>
                 <ul className="list-disc pl-4 space-y-0.5">
-                  <li>`FACEBOOK_APP_ID` is not set</li>
+                  <li>`FACEBOOK_APP_ID` / `NEXT_PUBLIC_FACEBOOK_APP_ID` is not set</li>
                   <li>`FACEBOOK_APP_SECRET` is not set</li>
                 </ul>
                 <p className="mt-1 text-[10px] text-red-500">
@@ -230,15 +289,36 @@ export default function FacebookConnectCard({
                 </p>
               </div>
             ) : (
-              <a
-                href="/api/facebook/connect"
-                className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm"
-              >
-                <FacebookIcon size={16} />
-                Connect Facebook Page
-                <ExternalLink size={13} className="opacity-80" />
-              </a>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleConnect}
+                  disabled={connecting}
+                  className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {connecting ? (
+                    <>
+                      <RefreshCw size={16} className="animate-spin" />
+                      Connecting Facebook...
+                    </>
+                  ) : (
+                    <>
+                      <FacebookIcon size={16} />
+                      Connect Facebook Page
+                      <ExternalLink size={13} className="opacity-80" />
+                    </>
+                  )}
+                </button>
 
+                <div className="text-center">
+                  <a
+                    href="/api/facebook/connect"
+                    className="text-[11px] text-gray-400 hover:text-gray-600 underline"
+                  >
+                    Or use direct OAuth redirect link
+                  </a>
+                </div>
+              </div>
             )}
           </div>
         )}
