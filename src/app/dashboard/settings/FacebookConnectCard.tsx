@@ -46,8 +46,17 @@ export default function FacebookConnectCard({
   const [selectedPageId, setSelectedPageId] = useState<string>(pageId || '')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [origin, setOrigin] = useState('')
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [, startTransition] = useTransition()
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin)
+    }
+  }, [])
+
 
   useEffect(() => {
     if (isConnected) {
@@ -304,7 +313,7 @@ export default function FacebookConnectCard({
                 </p>
               </div>
             ) : (
-              <div className="space-y-2 pt-1">
+              <div className="space-y-3 pt-1">
                 <button
                   type="button"
                   onClick={handleConnectSdk}
@@ -319,21 +328,42 @@ export default function FacebookConnectCard({
                   ) : (
                     <>
                       <FacebookIcon size={16} />
-                      Connect Facebook Page (Popup)
+                      Connect Facebook Page
                       <ExternalLink size={13} className="opacity-80" />
                     </>
                   )}
                 </button>
 
-                <div className="pt-1 flex items-center justify-center">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-1.5">
+                  <div className="font-semibold text-gray-800 flex items-center justify-between">
+                    <span>Required Redirect URI for Meta Console:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${origin || 'https://modeshare.net'}/api/facebook/callback`)
+                        setCopied(true)
+                        setTimeout(() => setCopied(false), 2000)
+                      }}
+                      className="text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
+                    >
+                      {copied ? 'Copied!' : 'Copy URI'}
+                    </button>
+                  </div>
+                  <code className="block font-mono text-[11px] text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 select-all break-all">
+                    {origin || 'https://modeshare.net'}/api/facebook/callback
+                  </code>
+                </div>
+
+                <div className="text-center pt-0.5">
                   <a
                     href="/api/facebook/connect"
                     className="text-xs text-gray-500 hover:text-blue-600 font-medium inline-flex items-center gap-1 transition"
                   >
-                    Direct OAuth Redirect Login <ArrowRight size={11} />
+                    Direct OAuth Redirect Link <ArrowRight size={11} />
                   </a>
                 </div>
               </div>
+
             )}
           </div>
         )}
