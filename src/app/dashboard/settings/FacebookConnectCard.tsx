@@ -329,6 +329,7 @@ export default function FacebookConnectCard({
                 href={configId ? `/api/facebook/connect?config_id=${encodeURIComponent(configId)}` : '/api/facebook/connect'}
                 className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
+                <RefreshCw size={12} />
                 Reconnect or switch account
               </a>
               <Button
@@ -342,6 +343,38 @@ export default function FacebookConnectCard({
                 Disconnect
               </Button>
             </div>
+
+            {/* Quick token refresh box */}
+            <details className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-2.5">
+              <summary className="font-medium text-gray-700 cursor-pointer select-none flex items-center justify-between">
+                <span>⚡ Update / Refresh Access Token</span>
+                <span className="text-[10px] text-blue-600">Click to expand</span>
+              </summary>
+              <div className="mt-2.5 space-y-2 pt-2 border-t border-gray-200 text-[11px]">
+                <p className="text-gray-600">
+                  If Facebook reported your session expired, paste a fresh user/page token from Meta Graph Explorer to renew it instantly:
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    placeholder="Paste Access Token (EAA...)"
+                    value={manualToken}
+                    onChange={(e) => setManualToken(e.target.value)}
+                    className="flex-1 bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleManualTokenConnect}
+                    loading={savingToken}
+                    disabled={!manualToken.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 text-xs px-3"
+                  >
+                    Save Token
+                  </Button>
+                </div>
+              </div>
+            </details>
           </>
         ) : (
           <div className="space-y-3">
@@ -373,60 +406,20 @@ export default function FacebookConnectCard({
               </div>
             ) : (
               <div className="space-y-3 pt-1">
-                <div className="bg-amber-50/70 border border-amber-200/80 rounded-lg p-3 text-xs text-amber-900 space-y-2">
-                  <div className="font-semibold flex items-center justify-between text-amber-900">
-                    <span>Login Configuration ID (For Business Apps):</span>
-                    <span className="text-[10px] bg-amber-200/70 px-1.5 py-0.5 rounded font-mono">Meta Business Login</span>
-                  </div>
-                  <p className="text-[11px] text-amber-800 leading-relaxed">
-                    Meta Business Apps require a <strong>Configuration ID</strong>. In Meta Developers, go to:
-                    <br />
-                    <span className="font-medium">Facebook Login for Business &rarr; Configurations</span> &rarr; copy your numeric Configuration ID and paste it below:
-                  </p>
-                  <input
-                    type="text"
-                    placeholder="e.g. 109283746592019 (Configuration ID)"
-                    value={configId}
-                    onChange={(e) => handleConfigIdChange(e.target.value)}
-                    className="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
+                <a
+                  href="/api/facebook/connect"
+                  className="inline-flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm cursor-pointer"
+                >
+                  <FacebookIcon size={16} />
+                  Connect Facebook Page
+                  <ArrowRight size={13} className="opacity-80" />
+                </a>
 
-                <div className="flex flex-col sm:flex-row gap-2.5">
-                  <a
-                    href={configId ? `/api/facebook/connect?config_id=${encodeURIComponent(configId)}` : '/api/facebook/connect'}
-                    className="inline-flex items-center justify-center gap-2 flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm transition shadow-sm cursor-pointer"
-                  >
-                    <FacebookIcon size={16} />
-                    Connect via Direct OAuth
-                    <ArrowRight size={13} className="opacity-80" />
-                  </a>
-
-                  <button
-                    type="button"
-                    onClick={handleConnectSdk}
-                    disabled={connecting}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-xs transition cursor-pointer disabled:opacity-75"
-                  >
-                    {connecting ? (
-                      <>
-                        <RefreshCw size={13} className="animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        Connect via Popup
-                        <ExternalLink size={12} className="opacity-70" />
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {/* Instant Token Fallback (Bypasses OAuth Redirects) */}
+                {/* Instant Token Setup for Staff / Admins */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 text-xs text-slate-700">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-900 flex items-center gap-1.5">
-                      <span>⚡ Instant 1-Click Setup (Meta Graph Token)</span>
+                      <span>⚡ Connect with Meta Access Token</span>
                     </span>
                     <a
                       href="https://developers.facebook.com/tools/explorer/"
@@ -434,16 +427,16 @@ export default function FacebookConnectCard({
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-700 font-medium inline-flex items-center gap-1"
                     >
-                      Open Graph Explorer <ExternalLink size={11} />
+                      Graph Explorer <ExternalLink size={11} />
                     </a>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Bypass OAuth redirect settings completely: Generate an access token in Meta&apos;s Graph API Explorer and paste it below:
+                    Paste your Facebook User or Page Access Token from Meta to link your Page instantly:
                   </p>
                   <div className="flex gap-2">
                     <input
                       type="password"
-                      placeholder="Paste User or Page Access Token (EAA...)"
+                      placeholder="Paste Access Token (EAA...)"
                       value={manualToken}
                       onChange={(e) => setManualToken(e.target.value)}
                       className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -461,30 +454,30 @@ export default function FacebookConnectCard({
                   </div>
                 </div>
 
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600 space-y-2">
-                  <div className="font-semibold text-gray-800 flex items-center justify-between">
-                    <span>Active OAuth Configuration in Modeshare:</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${origin || 'https://modeshare.net'}/api/facebook/callback`)
-                        setCopied(true)
-                        setTimeout(() => setCopied(false), 2000)
-                      }}
-                      className="text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
-                    >
-                      {copied ? 'Copied URI!' : 'Copy URI'}
-                    </button>
+                {/* Advanced Configuration (Collapsed by default for regular staff) */}
+                <details className="text-xs text-gray-500 bg-gray-50/70 border border-gray-200/80 rounded-lg px-3 py-2">
+                  <summary className="font-medium text-gray-600 cursor-pointer select-none">
+                    Advanced Developer Settings
+                  </summary>
+                  <div className="mt-2.5 space-y-2 pt-2 border-t border-gray-200/60 text-[11px]">
+                    <div>
+                      <label className="block font-medium text-gray-700 mb-1">
+                        Login Configuration ID:
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="1615779169941437"
+                        value={configId}
+                        onChange={(e) => handleConfigIdChange(e.target.value)}
+                        className="w-full bg-white border border-gray-300 rounded px-2.5 py-1 text-xs font-mono text-gray-800"
+                      />
+                    </div>
+                    <div className="space-y-1 font-mono bg-white border border-gray-200 rounded p-2 text-gray-600">
+                      <div><strong>App ID:</strong> {appId || '948046124459514'}</div>
+                      <div><strong>Redirect URI:</strong> {origin || 'https://modeshare.net'}/api/facebook/callback</div>
+                    </div>
                   </div>
-                  <div className="space-y-1 text-[11px] font-mono bg-white border border-gray-200 rounded p-2 text-gray-700">
-                    <div><strong>App ID:</strong> {appId || '(Not set in env)'}</div>
-                    <div><strong>Redirect URI:</strong> {origin || 'https://modeshare.net'}/api/facebook/callback</div>
-                    <div><strong>Config ID:</strong> {configId || '(None — using standard scopes)'}</div>
-                  </div>
-                  <p className="text-[11px] text-gray-500">
-                    Ensure <strong>{origin || 'https://modeshare.net'}/api/facebook/callback</strong> is saved as a tag in <strong>Facebook Login for Business &rarr; Settings &rarr; Valid OAuth Redirect URIs</strong>.
-                  </p>
-                </div>
+                </details>
               </div>
             )}
           </div>

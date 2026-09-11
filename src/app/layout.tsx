@@ -14,7 +14,7 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const fbAppId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || process.env.FACEBOOK_APP_ID || ''
+  const fbAppId = process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || process.env.FACEBOOK_APP_ID || '948046124459514'
   const fbApiVersion = process.env.NEXT_PUBLIC_FACEBOOK_API_VERSION || 'v19.0'
 
   return (

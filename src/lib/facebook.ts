@@ -48,9 +48,9 @@ export function resolveFacebookRedirectUri(requestOrigin?: string): string {
  * Generate Facebook OAuth authorization URL
  */
 export function getFacebookAuthUrl(state: string, requestOrigin?: string, explicitConfigId?: string): string {
-  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
+  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '948046124459514').trim()
   const redirectUri = resolveFacebookRedirectUri(requestOrigin)
-  const configId = (explicitConfigId || process.env.FACEBOOK_CONFIG_ID || process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || '').trim()
+  const configId = (explicitConfigId || process.env.FACEBOOK_CONFIG_ID || process.env.NEXT_PUBLIC_FACEBOOK_CONFIG_ID || '1615779169941437').trim()
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -79,7 +79,7 @@ export function getFacebookAuthUrl(state: string, requestOrigin?: string, explic
  * Upgrade short-lived token to long-lived 60-day token
  */
 export async function upgradeToLongLivedToken(shortLivedToken: string): Promise<string> {
-  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
+  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '948046124459514').trim()
   const clientSecret = (process.env.FACEBOOK_APP_SECRET || '').trim()
 
   if (!clientId || !clientSecret) {
@@ -105,7 +105,7 @@ export async function upgradeToLongLivedToken(shortLivedToken: string): Promise<
  * Exchange auth code for user access token and upgrade to a long-lived user token (60-day expiry)
  */
 export async function exchangeFacebookCode(code: string, requestOrigin?: string): Promise<string> {
-  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '').trim()
+  const clientId = (process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '948046124459514').trim()
   const clientSecret = (process.env.FACEBOOK_APP_SECRET || '').trim()
   const redirectUri = resolveFacebookRedirectUri(requestOrigin)
 
