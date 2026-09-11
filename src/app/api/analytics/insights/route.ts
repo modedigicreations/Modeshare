@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('posts')
       .select('platform, metrics, brief:briefs(tone)')
-      .not('buffer_post_id', 'is', null)
+      .or('buffer_post_id.not.is.null,facebook_post_id.not.is.null')
 
     if (!isSuperAdmin) {
       query = query.eq('user_id', user.id)

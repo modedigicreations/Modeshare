@@ -103,12 +103,18 @@ export async function generatePosts(
 
   const data = await response.json()
   const raw = data.choices?.[0]?.message?.content
-
   if (!raw) throw new Error('Empty response from DeepSeek')
+
+  let cleanedRaw = raw.trim()
+  if (cleanedRaw.startsWith('```json')) {
+    cleanedRaw = cleanedRaw.replace(/^```json\s*/i, '').replace(/\s*```$/, '')
+  } else if (cleanedRaw.startsWith('```')) {
+    cleanedRaw = cleanedRaw.replace(/^```\s*/, '').replace(/\s*```$/, '')
+  }
 
   let parsed: { posts: GeneratedVariant[] }
   try {
-    parsed = JSON.parse(raw)
+    parsed = JSON.parse(cleanedRaw)
   } catch {
     throw new Error('Failed to parse DeepSeek JSON response')
   }

@@ -4,8 +4,18 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Never intercept these paths
-  const bypass = ['/api/', '/_next/', '/favicon', '/login', '/auth/']
+  // Never intercept these public and asset paths
+  const bypass = [
+    '/api/',
+    '/_next/',
+    '/favicon',
+    '/login',
+    '/auth/',
+    '/reset-password',
+    '/privacy',
+    '/terms',
+    '/data-deletion',
+  ]
   if (bypass.some((p) => pathname.startsWith(p))) {
     return NextResponse.next({ request })
   }
@@ -48,21 +58,15 @@ export async function updateSession(request: NextRequest) {
       // Not authenticated — redirect to login
       const url = request.nextUrl.clone()
       url.pathname = '/login'
-      if (error) {
-        url.searchParams.set('error', `Session error: ${error.message}. Cookies: [${cookieNames}]`)
-      } else {
-        url.searchParams.set('error', `No active user session. Cookies: [${cookieNames}]`)
-      }
       return NextResponse.redirect(url)
     }
 
     return supabaseResponse
 
   } catch (err) {
-    // On any error, redirect to login with error details rather than crashing silently
+    // On any error, redirect to login cleanly
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('error', `Middleware crash: ${err instanceof Error ? err.message : String(err)}`)
     return NextResponse.redirect(url)
   }
 }

@@ -24,7 +24,7 @@ export default async function AnalyticsPage() {
 
   const isSuperAdmin = profile?.role === 'super_admin'
 
-  // Fetch all posts pushed to Buffer
+  // Fetch all posts pushed to Buffer or Facebook API
   let query = supabase
     .from('posts')
     .select(`
@@ -32,7 +32,7 @@ export default async function AnalyticsPage() {
       brief:briefs(topic, tone),
       profile:profiles!posts_user_id_fkey(full_name, email)
     `)
-    .not('buffer_post_id', 'is', null)
+    .or('buffer_post_id.not.is.null,facebook_post_id.not.is.null')
 
   if (!isSuperAdmin) {
     query = query.eq('user_id', user.id)
@@ -47,7 +47,7 @@ export default async function AnalyticsPage() {
           {isSuperAdmin ? 'Team Performance Analytics' : 'My Performance Analytics'}
         </h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Performance metrics synced directly from your Buffer connections
+          Performance metrics synced directly from your Buffer and Facebook Page connections
         </p>
       </div>
 

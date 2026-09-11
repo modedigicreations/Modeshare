@@ -40,25 +40,32 @@ export async function POST(request: NextRequest) {
     const bufferConnectionsMap: Record<string, string> = {}
     const facebookConnectionsMap: Record<string, string> = {}
 
-    for (const uid of userIds) {
+    if (userIds.length > 0) {
       const [bufferRes, fbRes] = await Promise.all([
         supabase
           .from('buffer_connections')
-          .select('access_token')
-          .eq('user_id', uid)
-          .single(),
+          .select('user_id, access_token')
+          .in('user_id', userIds),
         supabase
           .from('facebook_connections')
-          .select('page_access_token')
-          .eq('user_id', uid)
-          .single(),
+          .select('user_id, page_access_token')
+          .in('user_id', userIds),
       ])
 
-      if (bufferRes.data?.access_token) {
-        bufferConnectionsMap[uid] = bufferRes.data.access_token
+      if (bufferRes.data) {
+        for (const conn of bufferRes.data) {
+          if (conn.access_token) {
+            bufferConnectionsMap[conn.user_id] = conn.access_token
+          }
+        }
       }
-      if (fbRes.data?.page_access_token) {
-        facebookConnectionsMap[uid] = fbRes.data.page_access_token
+
+      if (fbRes.data) {
+        for (const conn of fbRes.data) {
+          if (conn.page_access_token) {
+            facebookConnectionsMap[conn.user_id] = conn.page_access_token
+          }
+        }
       }
     }
 
