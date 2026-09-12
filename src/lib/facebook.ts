@@ -314,30 +314,45 @@ export async function resolveFacebookConnection(
     console.warn('/me/accounts query error:', err)
   }
 
-  // 4. Strategy B: Meta Business System User Assigned Pages (/me/assigned_pages)
-  try {
-    const assignedUrl = new URL(`${FB_GRAPH_BASE}/me/assigned_pages`)
-    assignedUrl.searchParams.set('access_token', cleanToken)
-    assignedUrl.searchParams.set('fields', 'id,name,access_token,category')
+  // 4. Strategy B: Meta Business System User Assigned Pages (/me/assigned_pages and assigned_assets)
+  const candidateEndpoints = [
+    `${FB_GRAPH_BASE}/me/assigned_pages`,
+    `${FB_GRAPH_BASE}/me/assigned_assets`,
+    `${FB_GRAPH_BASE}/me/accounts`,
+  ]
+  if (meData.id) {
+    candidateEndpoints.push(`${FB_GRAPH_BASE}/${meData.id}/assigned_pages`)
+    candidateEndpoints.push(`${FB_GRAPH_BASE}/${meData.id}/assigned_assets`)
+  }
 
-    const assignedRes = await fetch(assignedUrl.toString(), { method: 'GET' })
-    const assignedData = assignedRes.ok ? await assignedRes.json() : null
-
-    if (assignedData && Array.isArray(assignedData.data) && assignedData.data.length > 0) {
-      return {
-        pages: assignedData.data.map((acc: { id: string; name: string; access_token: string; category?: string }) => ({
-          id: acc.id,
-          name: acc.name,
-          access_token: acc.access_token || cleanToken,
-          category: acc.category,
-        })),
-        isDirectPageToken: false,
-        tokenType: 'user',
-        userToken: cleanToken,
+  for (const endpoint of candidateEndpoints) {
+    try {
+      const epUrl = new URL(endpoint)
+      epUrl.searchParams.set('access_token', cleanToken)
+      epUrl.searchParams.set('fields', 'id,name,access_token,category')
+      const epRes = await fetch(epUrl.toString(), { method: 'GET' })
+      if (epRes.ok) {
+        const epData = await epRes.json()
+        if (epData && Array.isArray(epData.data) && epData.data.length > 0) {
+          const foundPages = epData.data
+            .filter((item: { id?: string }) => Boolean(item.id))
+            .map((acc: { id: string; name: string; access_token?: string; category?: string }) => ({
+              id: acc.id,
+              name: acc.name || 'Facebook Page',
+              access_token: acc.access_token || cleanToken,
+              category: acc.category,
+            }))
+          if (foundPages.length > 0) {
+            return {
+              pages: foundPages,
+              isDirectPageToken: false,
+              tokenType: 'user',
+              userToken: cleanToken,
+            }
+          }
+        }
       }
-    }
-  } catch (err) {
-    console.warn('/me/assigned_pages query error:', err)
+    } catch {}
   }
 
   // 5. Strategy C: Check known default page (Dailymedia Nigeria: 419025421864993)
