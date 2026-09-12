@@ -182,10 +182,10 @@ export async function resolveFacebookConnection(
   const cleanToken = token.trim()
   const appSecret = (explicitAppSecret || process.env.FACEBOOK_APP_SECRET || '').trim()
 
-  // 1. Verify token via /me
+  // 1. Verify token via /me (use id,name which is valid on both User and Page nodes)
   const meUrl = new URL(`${FB_GRAPH_BASE}/me`)
   meUrl.searchParams.set('access_token', cleanToken)
-  meUrl.searchParams.set('fields', 'id,name,category')
+  meUrl.searchParams.set('fields', 'id,name')
 
   const meRes = await fetch(meUrl.toString(), { method: 'GET' })
   if (!meRes.ok) {
