@@ -182,7 +182,7 @@ export async function resolveFacebookConnection(
   const cleanToken = token.trim()
   const appSecret = (explicitAppSecret || process.env.FACEBOOK_APP_SECRET || '').trim()
 
-  // 1. Verify token via /me (use id,name which is valid on both User and Page nodes)
+  // 1. Verify token via /me
   const meUrl = new URL(`${FB_GRAPH_BASE}/me`)
   meUrl.searchParams.set('access_token', cleanToken)
   meUrl.searchParams.set('fields', 'id,name')
@@ -200,7 +200,7 @@ export async function resolveFacebookConnection(
 
   const meData = await meRes.json()
 
-  // 2. Try fetching managed pages assuming it might be a User Token
+  // 2. Strategy A: Standard User Managed Pages (/me/accounts)
   const accountsUrl = new URL(`${FB_GRAPH_BASE}/me/accounts`)
   accountsUrl.searchParams.set('access_token', cleanToken)
   accountsUrl.searchParams.set('fields', 'id,name,access_token,category')
@@ -209,12 +209,10 @@ export async function resolveFacebookConnection(
   const accountsData = accountsRes.ok ? await accountsRes.json() : null
 
   if (accountsData && Array.isArray(accountsData.data) && accountsData.data.length > 0) {
-    // This is a User Access Token!
     let longLivedUserToken = cleanToken
     if (appSecret) {
       try {
         longLivedUserToken = await upgradeToLongLivedToken(cleanToken)
-        // Re-fetch pages with the upgraded long-lived user token to obtain permanent page tokens!
         const upgradedAccountsUrl = new URL(`${FB_GRAPH_BASE}/me/accounts`)
         upgradedAccountsUrl.searchParams.set('access_token', longLivedUserToken)
         upgradedAccountsUrl.searchParams.set('fields', 'id,name,access_token,category')
@@ -253,24 +251,82 @@ export async function resolveFacebookConnection(
     }
   }
 
-  // 3. If /me/accounts did not return pages, verify if /me is a direct Facebook Page
-  if (meData.id) {
+  // 3. Strategy B: Meta Business System User Assigned Pages (/me/assigned_pages)
+  const assignedUrl = new URL(`${FB_GRAPH_BASE}/me/assigned_pages`)
+  assignedUrl.searchParams.set('access_token', cleanToken)
+  assignedUrl.searchParams.set('fields', 'id,name,access_token,category')
+
+  const assignedRes = await fetch(assignedUrl.toString(), { method: 'GET' })
+  const assignedData = assignedRes.ok ? await assignedRes.json() : null
+
+  if (assignedData && Array.isArray(assignedData.data) && assignedData.data.length > 0) {
     return {
-      pages: [
-        {
-          id: meData.id,
-          name: meData.name || 'Facebook Page',
-          access_token: cleanToken,
-          category: meData.category,
-        },
-      ],
-      isDirectPageToken: true,
-      tokenType: 'page',
+      pages: assignedData.data.map((acc: { id: string; name: string; access_token: string; category?: string }) => ({
+        id: acc.id,
+        name: acc.name,
+        access_token: acc.access_token || cleanToken,
+        category: acc.category,
+      })),
+      isDirectPageToken: false,
+      tokenType: 'user',
       userToken: cleanToken,
     }
   }
 
-  throw new Error('Could not find any Facebook Pages associated with this token.')
+  // 4. Strategy C: Query Known / Accessible Facebook Pages directly via Page ID
+  const knownPageIds = ['419025421864993']
+  for (const pid of knownPageIds) {
+    try {
+      const pageUrl = new URL(`${FB_GRAPH_BASE}/${pid}`)
+      pageUrl.searchParams.set('access_token', cleanToken)
+      pageUrl.searchParams.set('fields', 'id,name,access_token,category')
+      const pageRes = await fetch(pageUrl.toString(), { method: 'GET' })
+      if (pageRes.ok) {
+        const pageData = await pageRes.json()
+        if (pageData.id) {
+          return {
+            pages: [
+              {
+                id: pageData.id,
+                name: pageData.name || 'Facebook Page',
+                access_token: pageData.access_token || cleanToken,
+                category: pageData.category,
+              },
+            ],
+            isDirectPageToken: !pageData.access_token,
+            tokenType: 'page',
+            userToken: cleanToken,
+          }
+        }
+      }
+    } catch {}
+  }
+
+  // 5. Strategy D: Check if /me is a Facebook Page node itself
+  const checkPageUrl = new URL(`${FB_GRAPH_BASE}/me`)
+  checkPageUrl.searchParams.set('access_token', cleanToken)
+  checkPageUrl.searchParams.set('fields', 'id,name,category')
+  const checkPageRes = await fetch(checkPageUrl.toString(), { method: 'GET' })
+  if (checkPageRes.ok) {
+    const pageObj = await checkPageRes.json()
+    if (pageObj.category && pageObj.id) {
+      return {
+        pages: [
+          {
+            id: pageObj.id,
+            name: pageObj.name || 'Facebook Page',
+            access_token: cleanToken,
+            category: pageObj.category,
+          },
+        ],
+        isDirectPageToken: true,
+        tokenType: 'page',
+        userToken: cleanToken,
+      }
+    }
+  }
+
+  throw new Error('Could not find any Facebook Pages associated with this token. Please ensure the token has pages_manage_posts and pages_read_engagement permissions.')
 }
 
 /**
@@ -286,10 +342,27 @@ export async function scheduleFacebookPost(
   content: string,
   scheduledAt?: string | null
 ): Promise<{ id: string; isScheduled: boolean }> {
+  // 1. Resolve actual Page Access Token if a user/system token was provided
+  let effectiveToken = pageAccessToken
+  try {
+    const pageTokenUrl = new URL(`${FB_GRAPH_BASE}/${pageId}`)
+    pageTokenUrl.searchParams.set('fields', 'access_token')
+    pageTokenUrl.searchParams.set('access_token', pageAccessToken)
+    const pageTokenRes = await fetch(pageTokenUrl.toString(), { method: 'GET' })
+    if (pageTokenRes.ok) {
+      const pageTokenData = await pageTokenRes.json()
+      if (pageTokenData.access_token) {
+        effectiveToken = pageTokenData.access_token
+      }
+    }
+  } catch (resolveErr) {
+    console.warn('Page token pre-fetch warning:', resolveErr)
+  }
+
   const url = `${FB_GRAPH_BASE}/${pageId}/feed`
   const bodyParams: Record<string, string> = {
     message: content,
-    access_token: pageAccessToken,
+    access_token: effectiveToken,
   }
 
   let isScheduled = false
@@ -312,13 +385,25 @@ export async function scheduleFacebookPost(
     bodyParams.published = 'true'
   }
 
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams(bodyParams).toString(),
   })
+
+  // If first attempt failed with permission error and we have an original token, try fallback
+  if (!res.ok && effectiveToken !== pageAccessToken) {
+    bodyParams.access_token = pageAccessToken
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(bodyParams).toString(),
+    })
+  }
 
   if (!res.ok) {
     const err = await res.text()
