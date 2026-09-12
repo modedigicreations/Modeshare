@@ -55,17 +55,30 @@ export default function FacebookConnectCard({
 
   const [configId, setConfigId] = useState('')
   const [manualToken, setManualToken] = useState('')
+  const [appSecret, setAppSecret] = useState('')
   const [savingToken, setSavingToken] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setOrigin(window.location.origin)
       const savedConfig = localStorage.getItem('modeshare_fb_config_id')
-      if (savedConfig) {
-        setConfigId(savedConfig)
-      }
+      if (savedConfig) setConfigId(savedConfig)
+      const savedSecret = localStorage.getItem('modeshare_fb_app_secret')
+      if (savedSecret) setAppSecret(savedSecret)
     }
   }, [])
+
+  function handleAppSecretChange(val: string) {
+    const trimmed = val.trim()
+    setAppSecret(trimmed)
+    if (typeof window !== 'undefined') {
+      if (trimmed) {
+        localStorage.setItem('modeshare_fb_app_secret', trimmed)
+      } else {
+        localStorage.removeItem('modeshare_fb_app_secret')
+      }
+    }
+  }
 
   async function handleManualTokenConnect() {
     if (!manualToken.trim()) return
@@ -77,16 +90,23 @@ export default function FacebookConnectCard({
       const res = await fetch('/api/facebook/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: manualToken.trim() }),
+        body: JSON.stringify({
+          accessToken: manualToken.trim(),
+          appSecret: appSecret.trim() || undefined,
+        }),
       })
 
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to connect Facebook Page')
 
-      setSuccess(`Connected successfully to ${data.page?.name || 'Facebook Page'}!`)
+      const tokenMsg = data.isDirectPageToken
+        ? 'Direct Page Token verified and saved (Permanent).'
+        : 'User Token successfully exchanged for a long-lived Page Token.'
+
+      setSuccess(`Connected successfully to ${data.page?.name || 'Facebook Page'}! ${tokenMsg}`)
       setTimeout(() => {
         window.location.reload()
-      }, 1500)
+      }, 1800)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to connect Facebook account')
       setSavingToken(false)
@@ -347,31 +367,40 @@ export default function FacebookConnectCard({
             {/* Quick token refresh box */}
             <details className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-2.5">
               <summary className="font-medium text-gray-700 cursor-pointer select-none flex items-center justify-between">
-                <span>⚡ Update / Refresh Access Token</span>
-                <span className="text-[10px] text-blue-600">Click to expand</span>
+                <span>⚡ Renew with Permanent Access Token</span>
+                <span className="text-[10px] text-blue-600 font-medium">Click to expand</span>
               </summary>
-              <div className="mt-2.5 space-y-2 pt-2 border-t border-gray-200 text-[11px]">
-                <p className="text-gray-600">
-                  If Facebook reported your session expired, paste a fresh user/page token from Meta Graph Explorer to renew it instantly:
+              <div className="mt-2.5 space-y-2.5 pt-2 border-t border-gray-200 text-[11px]">
+                <p className="text-gray-600 leading-relaxed">
+                  To prevent token expiration permanently, paste a <strong>Never-Expiring Page Token</strong> or enter your <strong>Meta App Secret</strong> below:
                 </p>
-                <div className="flex gap-2">
+                <div className="space-y-2">
                   <input
                     type="password"
-                    placeholder="Paste Access Token (EAA...)"
+                    placeholder="Paste Meta Access Token (EAA...)"
                     value={manualToken}
                     onChange={(e) => setManualToken(e.target.value)}
-                    className="flex-1 bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={handleManualTokenConnect}
-                    loading={savingToken}
-                    disabled={!manualToken.trim()}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 text-xs px-3"
-                  >
-                    Save Token
-                  </Button>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      placeholder="Meta App Secret (optional for permanent upgrade)"
+                      value={appSecret}
+                      onChange={(e) => handleAppSecretChange(e.target.value)}
+                      className="flex-1 bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleManualTokenConnect}
+                      loading={savingToken}
+                      disabled={!manualToken.trim()}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 text-xs px-3"
+                    >
+                      Save & Link
+                    </Button>
+                  </div>
                 </div>
               </div>
             </details>
@@ -415,11 +444,11 @@ export default function FacebookConnectCard({
                   <ArrowRight size={13} className="opacity-80" />
                 </a>
 
-                {/* Instant Token Setup for Staff / Admins */}
+                {/* Instant Permanent Token Setup */}
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5 text-xs text-slate-700">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-900 flex items-center gap-1.5">
-                      <span>⚡ Connect with Meta Access Token</span>
+                      <span>⚡ Permanent Access Token Connection</span>
                     </span>
                     <a
                       href="https://developers.facebook.com/tools/explorer/"
@@ -431,26 +460,35 @@ export default function FacebookConnectCard({
                     </a>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Paste your Facebook User or Page Access Token from Meta to link your Page instantly:
+                    Paste your Facebook User or Page Access Token from Meta. Providing your App Secret will automatically upgrade it to a permanent never-expiring token:
                   </p>
-                  <div className="flex gap-2">
+                  <div className="space-y-2">
                     <input
                       type="password"
-                      placeholder="Paste Access Token (EAA...)"
+                      placeholder="Paste Meta Access Token (EAA...)"
                       value={manualToken}
                       onChange={(e) => setManualToken(e.target.value)}
-                      className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleManualTokenConnect}
-                      loading={savingToken}
-                      disabled={!manualToken.trim()}
-                      className="bg-slate-900 hover:bg-black text-white shrink-0 text-xs px-3"
-                    >
-                      Connect Page
-                    </Button>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="Meta App Secret (optional for auto-exchange)"
+                        value={appSecret}
+                        onChange={(e) => handleAppSecretChange(e.target.value)}
+                        className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleManualTokenConnect}
+                        loading={savingToken}
+                        disabled={!manualToken.trim()}
+                        className="bg-slate-900 hover:bg-black text-white shrink-0 text-xs px-3"
+                      >
+                        Connect Page
+                      </Button>
+                    </div>
                   </div>
                 </div>
 

@@ -166,6 +166,114 @@ export async function getFacebookPages(userAccessToken: string): Promise<Faceboo
 }
 
 /**
+ * Inspect, upgrade, and resolve Facebook Page(s) from either:
+ * 1. A User Access Token (short-lived or long-lived) -> upgrades & fetches managed pages and permanent page tokens
+ * 2. A Direct Page Access Token (e.g. from System User / Business Suite) -> directly validates the page
+ */
+export async function resolveFacebookConnection(
+  token: string,
+  explicitAppSecret?: string
+): Promise<{
+  pages: FacebookPage[]
+  isDirectPageToken: boolean
+  tokenType: 'user' | 'page'
+  userToken: string
+}> {
+  const cleanToken = token.trim()
+  const appSecret = (explicitAppSecret || process.env.FACEBOOK_APP_SECRET || '').trim()
+
+  // 1. Verify token via /me
+  const meUrl = new URL(`${FB_GRAPH_BASE}/me`)
+  meUrl.searchParams.set('access_token', cleanToken)
+  meUrl.searchParams.set('fields', 'id,name,category')
+
+  const meRes = await fetch(meUrl.toString(), { method: 'GET' })
+  if (!meRes.ok) {
+    const errText = await meRes.text()
+    let msg = errText
+    try {
+      const json = JSON.parse(errText)
+      if (json.error?.message) msg = json.error.message
+    } catch {}
+    throw new Error(`Invalid Facebook Access Token: ${msg}`)
+  }
+
+  const meData = await meRes.json()
+
+  // 2. Try fetching managed pages assuming it might be a User Token
+  const accountsUrl = new URL(`${FB_GRAPH_BASE}/me/accounts`)
+  accountsUrl.searchParams.set('access_token', cleanToken)
+  accountsUrl.searchParams.set('fields', 'id,name,access_token,category')
+
+  const accountsRes = await fetch(accountsUrl.toString(), { method: 'GET' })
+  const accountsData = accountsRes.ok ? await accountsRes.json() : null
+
+  if (accountsData && Array.isArray(accountsData.data) && accountsData.data.length > 0) {
+    // This is a User Access Token!
+    let longLivedUserToken = cleanToken
+    if (appSecret) {
+      try {
+        longLivedUserToken = await upgradeToLongLivedToken(cleanToken)
+        // Re-fetch pages with the upgraded long-lived user token to obtain permanent page tokens!
+        const upgradedAccountsUrl = new URL(`${FB_GRAPH_BASE}/me/accounts`)
+        upgradedAccountsUrl.searchParams.set('access_token', longLivedUserToken)
+        upgradedAccountsUrl.searchParams.set('fields', 'id,name,access_token,category')
+        const upgradedRes = await fetch(upgradedAccountsUrl.toString(), { method: 'GET' })
+        if (upgradedRes.ok) {
+          const upgradedData = await upgradedRes.json()
+          if (Array.isArray(upgradedData.data) && upgradedData.data.length > 0) {
+            return {
+              pages: upgradedData.data.map((acc: { id: string; name: string; access_token: string; category?: string }) => ({
+                id: acc.id,
+                name: acc.name,
+                access_token: acc.access_token,
+                category: acc.category,
+              })),
+              isDirectPageToken: false,
+              tokenType: 'user',
+              userToken: longLivedUserToken,
+            }
+          }
+        }
+      } catch (upgradeErr) {
+        console.warn('Long-lived token upgrade warning:', upgradeErr)
+      }
+    }
+
+    return {
+      pages: accountsData.data.map((acc: { id: string; name: string; access_token: string; category?: string }) => ({
+        id: acc.id,
+        name: acc.name,
+        access_token: acc.access_token,
+        category: acc.category,
+      })),
+      isDirectPageToken: false,
+      tokenType: 'user',
+      userToken: cleanToken,
+    }
+  }
+
+  // 3. If /me/accounts did not return pages, verify if /me is a direct Facebook Page
+  if (meData.id) {
+    return {
+      pages: [
+        {
+          id: meData.id,
+          name: meData.name || 'Facebook Page',
+          access_token: cleanToken,
+          category: meData.category,
+        },
+      ],
+      isDirectPageToken: true,
+      tokenType: 'page',
+      userToken: cleanToken,
+    }
+  }
+
+  throw new Error('Could not find any Facebook Pages associated with this token.')
+}
+
+/**
  * Schedule or publish a post to a Facebook Page feed
  * 
  * Note: Facebook Page post scheduling requires scheduled_publish_time to be between

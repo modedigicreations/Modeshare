@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { upgradeToLongLivedToken, getFacebookPages } from '@/lib/facebook'
+import { resolveFacebookConnection } from '@/lib/facebook'
 import { z } from 'zod'
 
 const tokenSchema = z.object({
   accessToken: z.string().min(1),
+  appSecret: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -19,27 +20,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing access token' }, { status: 400 })
     }
 
-    const { accessToken } = parsed.data
+    const { accessToken, appSecret } = parsed.data
 
-    // 1. Upgrade token to long-lived 60-day token
-    const longLivedToken = await upgradeToLongLivedToken(accessToken)
+    // 1. Resolve and upgrade token to permanent page token
+    const result = await resolveFacebookConnection(accessToken, appSecret)
 
-    // 2. Fetch Facebook Pages
-    const pages = await getFacebookPages(longLivedToken)
-    if (pages.length === 0) {
+    if (result.pages.length === 0) {
       return NextResponse.json(
         { error: 'No Facebook Pages found. Make sure your account administers at least one Facebook Page.' },
         { status: 400 }
       )
     }
 
-    const selectedPage = pages[0]
+    const selectedPage = result.pages[0]
 
-    // 3. Upsert facebook_connections
+    // 2. Upsert facebook_connections with the permanent page access token
     const { error: upsertError } = await supabase.from('facebook_connections').upsert(
       {
         user_id: user.id,
-        access_token: longLivedToken,
+        access_token: result.userToken,
         page_id: selectedPage.id,
         page_name: selectedPage.name,
         page_access_token: selectedPage.access_token,
@@ -58,7 +57,9 @@ export async function POST(request: NextRequest) {
         id: selectedPage.id,
         name: selectedPage.name,
       },
-      pagesCount: pages.length,
+      pagesCount: result.pages.length,
+      tokenType: result.tokenType,
+      isDirectPageToken: result.isDirectPageToken,
     })
   } catch (err) {
     console.error('Facebook token exchange error:', err)
