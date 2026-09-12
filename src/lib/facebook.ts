@@ -187,26 +187,43 @@ export async function resolveFacebookConnection(
   if (explicitTargetPageId && explicitTargetPageId.trim()) {
     const cleanTargetId = explicitTargetPageId.trim()
     try {
-      const targetUrl = new URL(`${FB_GRAPH_BASE}/${cleanTargetId}`)
+      // Try with access_token and category fields first
+      let targetUrl = new URL(`${FB_GRAPH_BASE}/${cleanTargetId}`)
       targetUrl.searchParams.set('access_token', cleanToken)
       targetUrl.searchParams.set('fields', 'id,name,access_token,category')
-      const targetRes = await fetch(targetUrl.toString(), { method: 'GET' })
-      if (targetRes.ok) {
-        const targetData = await targetRes.json()
-        if (targetData.id) {
-          return {
-            pages: [
-              {
-                id: targetData.id,
-                name: targetData.name || 'Facebook Page',
-                access_token: targetData.access_token || cleanToken,
-                category: targetData.category,
-              },
-            ],
-            isDirectPageToken: !targetData.access_token,
-            tokenType: 'page',
-            userToken: cleanToken,
-          }
+      let targetRes = await fetch(targetUrl.toString(), { method: 'GET' })
+      let targetData = targetRes.ok ? await targetRes.json() : null
+
+      // Fallback to simpler fields if access_token or category are restricted
+      if (!targetData?.id) {
+        targetUrl = new URL(`${FB_GRAPH_BASE}/${cleanTargetId}`)
+        targetUrl.searchParams.set('access_token', cleanToken)
+        targetUrl.searchParams.set('fields', 'id,name,category')
+        targetRes = await fetch(targetUrl.toString(), { method: 'GET' })
+        if (targetRes.ok) targetData = await targetRes.json()
+      }
+
+      if (!targetData?.id) {
+        targetUrl = new URL(`${FB_GRAPH_BASE}/${cleanTargetId}`)
+        targetUrl.searchParams.set('access_token', cleanToken)
+        targetUrl.searchParams.set('fields', 'id,name')
+        targetRes = await fetch(targetUrl.toString(), { method: 'GET' })
+        if (targetRes.ok) targetData = await targetRes.json()
+      }
+
+      if (targetData?.id) {
+        return {
+          pages: [
+            {
+              id: targetData.id,
+              name: targetData.name || 'Facebook Page',
+              access_token: targetData.access_token || cleanToken,
+              category: targetData.category,
+            },
+          ],
+          isDirectPageToken: !targetData.access_token,
+          tokenType: 'page',
+          userToken: cleanToken,
         }
       } else {
         const errText = await targetRes.text()
@@ -222,10 +239,10 @@ export async function resolveFacebookConnection(
     }
   }
 
-  // 2. Query /me to inspect the token node
+  // 2. Query /me to inspect the token node (only query universally supported fields on /me)
   const meUrl = new URL(`${FB_GRAPH_BASE}/me`)
   meUrl.searchParams.set('access_token', cleanToken)
-  meUrl.searchParams.set('fields', 'id,name,category,tasks,business{id,name,owned_pages{id,name,access_token,category},client_pages{id,name,access_token,category}}')
+  meUrl.searchParams.set('fields', 'id,name')
 
   const meRes = await fetch(meUrl.toString(), { method: 'GET' })
   if (!meRes.ok) {
@@ -321,91 +338,45 @@ export async function resolveFacebookConnection(
     console.warn('/me/assigned_pages query error:', err)
   }
 
-  // 5. Strategy C: Meta Business Owned/Client Pages from /me?fields=business{...}
-  const businessPages: FacebookPage[] = []
-  if (meData.business?.owned_pages?.data && Array.isArray(meData.business.owned_pages.data)) {
-    for (const p of meData.business.owned_pages.data) {
-      if (p.id) {
-        businessPages.push({
-          id: p.id,
-          name: p.name || 'Facebook Page',
-          access_token: p.access_token || cleanToken,
-          category: p.category,
-        })
-      }
-    }
-  }
-  if (meData.business?.client_pages?.data && Array.isArray(meData.business.client_pages.data)) {
-    for (const p of meData.business.client_pages.data) {
-      if (p.id && !businessPages.some(bp => bp.id === p.id)) {
-        businessPages.push({
-          id: p.id,
-          name: p.name || 'Facebook Page',
-          access_token: p.access_token || cleanToken,
-          category: p.category,
-        })
-      }
-    }
-  }
-
-  if (businessPages.length > 0) {
-    return {
-      pages: businessPages,
-      isDirectPageToken: false,
-      tokenType: 'user',
-      userToken: cleanToken,
-    }
-  }
-
-  // 6. Strategy D: Check known default page (Dailymedia Nigeria: 419025421864993)
+  // 5. Strategy C: Check known default page (Dailymedia Nigeria: 419025421864993)
   try {
-    const defaultPageUrl = new URL(`${FB_GRAPH_BASE}/419025421864993`)
+    let defaultPageUrl = new URL(`${FB_GRAPH_BASE}/419025421864993`)
     defaultPageUrl.searchParams.set('access_token', cleanToken)
     defaultPageUrl.searchParams.set('fields', 'id,name,access_token,category')
-    const defRes = await fetch(defaultPageUrl.toString(), { method: 'GET' })
-    if (defRes.ok) {
-      const defData = await defRes.json()
-      if (defData.id) {
-        return {
-          pages: [
-            {
-              id: defData.id,
-              name: defData.name || 'Dailymedia Nigeria',
-              access_token: defData.access_token || cleanToken,
-              category: defData.category,
-            },
-          ],
-          isDirectPageToken: !defData.access_token,
-          tokenType: 'page',
-          userToken: cleanToken,
-        }
+    let defRes = await fetch(defaultPageUrl.toString(), { method: 'GET' })
+    let defData = defRes.ok ? await defRes.json() : null
+
+    if (!defData?.id) {
+      defaultPageUrl = new URL(`${FB_GRAPH_BASE}/419025421864993`)
+      defaultPageUrl.searchParams.set('access_token', cleanToken)
+      defaultPageUrl.searchParams.set('fields', 'id,name')
+      defRes = await fetch(defaultPageUrl.toString(), { method: 'GET' })
+      if (defRes.ok) defData = await defRes.json()
+    }
+
+    if (defData?.id) {
+      return {
+        pages: [
+          {
+            id: defData.id,
+            name: defData.name || 'Dailymedia Nigeria',
+            access_token: defData.access_token || cleanToken,
+            category: defData.category,
+          },
+        ],
+        isDirectPageToken: !defData.access_token,
+        tokenType: 'page',
+        userToken: cleanToken,
       }
     }
   } catch {}
-
-  // 7. Strategy E: Check if /me itself is a genuine Facebook Page (must have category or tasks)
-  if (meData.id && (meData.category || meData.tasks)) {
-    return {
-      pages: [
-        {
-          id: meData.id,
-          name: meData.name || 'Facebook Page',
-          access_token: cleanToken,
-          category: meData.category,
-        },
-      ],
-      isDirectPageToken: true,
-      tokenType: 'page',
-      userToken: cleanToken,
-    }
-  }
 
   // If this is a System User or User account with no pages discovered, provide a clear actionable error
   const nodeName = meData.name || 'System User / User'
   const nodeId = meData.id || ''
   throw new Error(
     `Connected to Meta account "${nodeName}" (${nodeId}), but no Facebook Page was found. ` +
-    `Please enter your Facebook Page ID (e.g. 419025421864993) in the "Target Page ID" field, ` +
+    `Please enter your Facebook Page ID (e.g. 419025421864993) in the "Target Facebook Page ID" field, ` +
     `or assign your Facebook Page under Meta Business Settings > Users > System Users > Assigned Assets.`
   )
 }
