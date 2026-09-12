@@ -184,6 +184,7 @@ export async function resolveFacebookConnection(
   const appSecret = (explicitAppSecret || process.env.FACEBOOK_APP_SECRET || '').trim()
 
   // 1. If an explicit Target Page ID is provided, query it directly
+  let targetPageErrorDetails = ''
   if (explicitTargetPageId && explicitTargetPageId.trim()) {
     const cleanTargetId = explicitTargetPageId.trim()
     try {
@@ -232,6 +233,7 @@ export async function resolveFacebookConnection(
           const parsed = JSON.parse(errText)
           if (parsed.error?.message) errMsg = parsed.error.message
         } catch {}
+        targetPageErrorDetails = errMsg
         console.warn(`Target page (${cleanTargetId}) query failed: ${errMsg}`)
       }
     } catch (targetErr) {
@@ -374,10 +376,11 @@ export async function resolveFacebookConnection(
   // If this is a System User or User account with no pages discovered, provide a clear actionable error
   const nodeName = meData.name || 'System User / User'
   const nodeId = meData.id || ''
+  const details = targetPageErrorDetails ? ` Meta API response: "${targetPageErrorDetails}".` : ''
   throw new Error(
-    `Connected to Meta account "${nodeName}" (${nodeId}), but no Facebook Page was found. ` +
-    `Please enter your Facebook Page ID (e.g. 419025421864993) in the "Target Facebook Page ID" field, ` +
-    `or assign your Facebook Page under Meta Business Settings > Users > System Users > Assigned Assets.`
+    `Connected to Meta account "${nodeName}" (${nodeId}), but no Facebook Page was found.${details} ` +
+    `Please ensure your Facebook Page is assigned under Meta Business Settings > Users > System Users > Assigned Assets, ` +
+    `and generate a new token after assigning the asset.`
   )
 }
 
