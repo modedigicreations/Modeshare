@@ -56,6 +56,7 @@ export default function FacebookConnectCard({
   const [configId, setConfigId] = useState('')
   const [manualToken, setManualToken] = useState('')
   const [appSecret, setAppSecret] = useState('')
+  const [targetPageId, setTargetPageId] = useState('')
   const [savingToken, setSavingToken] = useState(false)
 
   useEffect(() => {
@@ -65,6 +66,8 @@ export default function FacebookConnectCard({
       if (savedConfig) setConfigId(savedConfig)
       const savedSecret = localStorage.getItem('modeshare_fb_app_secret')
       if (savedSecret) setAppSecret(savedSecret)
+      const savedPageId = localStorage.getItem('modeshare_fb_target_page_id')
+      if (savedPageId) setTargetPageId(savedPageId)
     }
   }, [])
 
@@ -76,6 +79,18 @@ export default function FacebookConnectCard({
         localStorage.setItem('modeshare_fb_app_secret', trimmed)
       } else {
         localStorage.removeItem('modeshare_fb_app_secret')
+      }
+    }
+  }
+
+  function handleTargetPageIdChange(val: string) {
+    const trimmed = val.trim()
+    setTargetPageId(trimmed)
+    if (typeof window !== 'undefined') {
+      if (trimmed) {
+        localStorage.setItem('modeshare_fb_target_page_id', trimmed)
+      } else {
+        localStorage.removeItem('modeshare_fb_target_page_id')
       }
     }
   }
@@ -93,6 +108,7 @@ export default function FacebookConnectCard({
         body: JSON.stringify({
           accessToken: manualToken.trim(),
           appSecret: appSecret.trim() || undefined,
+          pageId: targetPageId.trim() || undefined,
         }),
       })
 
@@ -372,34 +388,50 @@ export default function FacebookConnectCard({
               </summary>
               <div className="mt-2.5 space-y-2.5 pt-2 border-t border-gray-200 text-[11px]">
                 <p className="text-gray-600 leading-relaxed">
-                  To prevent token expiration permanently, paste a <strong>Never-Expiring Page Token</strong> or enter your <strong>Meta App Secret</strong> below:
+                  To prevent token expiration permanently, paste a <strong>Never-Expiring Page Token</strong> or System User token:
                 </p>
                 <div className="space-y-2">
-                  <input
-                    type="password"
-                    placeholder="Paste Meta Access Token (EAA...)"
-                    value={manualToken}
-                    onChange={(e) => setManualToken(e.target.value)}
-                    className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  />
-                  <div className="flex gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Meta Access Token *</label>
                     <input
                       type="password"
-                      placeholder="Meta App Secret (optional for permanent upgrade)"
-                      value={appSecret}
-                      onChange={(e) => handleAppSecretChange(e.target.value)}
-                      className="flex-1 bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      placeholder="Paste Meta Access Token (EAA...)"
+                      value={manualToken}
+                      onChange={(e) => setManualToken(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleManualTokenConnect}
-                      loading={savingToken}
-                      disabled={!manualToken.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 text-xs px-3"
-                    >
-                      Save & Link
-                    </Button>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Target Facebook Page ID (Optional / Recommended)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 419025421864993 (Dailymedia Nigeria)"
+                      value={targetPageId}
+                      onChange={(e) => handleTargetPageIdChange(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-700 mb-0.5">Meta App Secret (Optional)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="Meta App Secret (optional for permanent upgrade)"
+                        value={appSecret}
+                        onChange={(e) => handleAppSecretChange(e.target.value)}
+                        className="flex-1 bg-white border border-gray-300 rounded px-2.5 py-1.5 font-mono text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleManualTokenConnect}
+                        loading={savingToken}
+                        disabled={!manualToken.trim()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white shrink-0 text-xs px-3"
+                      >
+                        Save & Link
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -460,34 +492,50 @@ export default function FacebookConnectCard({
                     </a>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-relaxed">
-                    Paste your Facebook User or Page Access Token from Meta. Providing your App Secret will automatically upgrade it to a permanent never-expiring token:
+                    Paste your Facebook User or Page Access Token from Meta:
                   </p>
                   <div className="space-y-2">
-                    <input
-                      type="password"
-                      placeholder="Paste Meta Access Token (EAA...)"
-                      value={manualToken}
-                      onChange={(e) => setManualToken(e.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    />
-                    <div className="flex gap-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-800 mb-0.5">Meta Access Token *</label>
                       <input
                         type="password"
-                        placeholder="Meta App Secret (optional for auto-exchange)"
-                        value={appSecret}
-                        onChange={(e) => handleAppSecretChange(e.target.value)}
-                        className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        placeholder="Paste Meta Access Token (EAA...)"
+                        value={manualToken}
+                        onChange={(e) => setManualToken(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       />
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={handleManualTokenConnect}
-                        loading={savingToken}
-                        disabled={!manualToken.trim()}
-                        className="bg-slate-900 hover:bg-black text-white shrink-0 text-xs px-3"
-                      >
-                        Connect Page
-                      </Button>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-800 mb-0.5">Target Facebook Page ID (Optional / Recommended)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 419025421864993 (Dailymedia Nigeria)"
+                        value={targetPageId}
+                        onChange={(e) => handleTargetPageIdChange(e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-800 mb-0.5">Meta App Secret (Optional)</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          placeholder="Meta App Secret (optional for auto-exchange)"
+                          value={appSecret}
+                          onChange={(e) => handleAppSecretChange(e.target.value)}
+                          className="flex-1 bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-gray-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleManualTokenConnect}
+                          loading={savingToken}
+                          disabled={!manualToken.trim()}
+                          className="bg-slate-900 hover:bg-black text-white shrink-0 text-xs px-3"
+                        >
+                          Connect Page
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

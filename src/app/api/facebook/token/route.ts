@@ -6,6 +6,7 @@ import { z } from 'zod'
 const tokenSchema = z.object({
   accessToken: z.string().min(1),
   appSecret: z.string().optional(),
+  pageId: z.string().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -20,10 +21,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing access token' }, { status: 400 })
     }
 
-    const { accessToken, appSecret } = parsed.data
+    const { accessToken, appSecret, pageId } = parsed.data
 
     // 1. Resolve and upgrade token to permanent page token
-    const result = await resolveFacebookConnection(accessToken, appSecret)
+    const result = await resolveFacebookConnection(accessToken, appSecret, pageId)
 
     if (result.pages.length === 0) {
       return NextResponse.json(
