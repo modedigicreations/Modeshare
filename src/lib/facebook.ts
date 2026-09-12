@@ -273,60 +273,40 @@ export async function resolveFacebookConnection(
     }
   }
 
-  // 4. Strategy C: Query Known / Accessible Facebook Pages directly via Page ID
-  const knownPageIds = ['419025421864993']
-  for (const pid of knownPageIds) {
+  // 4. Strategy C: Directly use the verified entity from /me
+  if (meData.id) {
+    let effectivePageToken = cleanToken
+
+    // Try fetching access_token if node is a Page
     try {
-      const pageUrl = new URL(`${FB_GRAPH_BASE}/${pid}`)
-      pageUrl.searchParams.set('access_token', cleanToken)
-      pageUrl.searchParams.set('fields', 'id,name,access_token,category')
-      const pageRes = await fetch(pageUrl.toString(), { method: 'GET' })
-      if (pageRes.ok) {
-        const pageData = await pageRes.json()
-        if (pageData.id) {
-          return {
-            pages: [
-              {
-                id: pageData.id,
-                name: pageData.name || 'Facebook Page',
-                access_token: pageData.access_token || cleanToken,
-                category: pageData.category,
-              },
-            ],
-            isDirectPageToken: !pageData.access_token,
-            tokenType: 'page',
-            userToken: cleanToken,
-          }
+      const pageDetailsUrl = new URL(`${FB_GRAPH_BASE}/${meData.id}`)
+      pageDetailsUrl.searchParams.set('access_token', cleanToken)
+      pageDetailsUrl.searchParams.set('fields', 'access_token,category')
+      const detailsRes = await fetch(pageDetailsUrl.toString(), { method: 'GET' })
+      if (detailsRes.ok) {
+        const detailsData = await detailsRes.json()
+        if (detailsData.access_token) {
+          effectivePageToken = detailsData.access_token
         }
       }
     } catch {}
-  }
 
-  // 5. Strategy D: Check if /me is a Facebook Page node itself
-  const checkPageUrl = new URL(`${FB_GRAPH_BASE}/me`)
-  checkPageUrl.searchParams.set('access_token', cleanToken)
-  checkPageUrl.searchParams.set('fields', 'id,name,category')
-  const checkPageRes = await fetch(checkPageUrl.toString(), { method: 'GET' })
-  if (checkPageRes.ok) {
-    const pageObj = await checkPageRes.json()
-    if (pageObj.category && pageObj.id) {
-      return {
-        pages: [
-          {
-            id: pageObj.id,
-            name: pageObj.name || 'Facebook Page',
-            access_token: cleanToken,
-            category: pageObj.category,
-          },
-        ],
-        isDirectPageToken: true,
-        tokenType: 'page',
-        userToken: cleanToken,
-      }
+    return {
+      pages: [
+        {
+          id: meData.id,
+          name: meData.name || 'Facebook Page',
+          access_token: effectivePageToken,
+          category: meData.category || undefined,
+        },
+      ],
+      isDirectPageToken: true,
+      tokenType: 'page',
+      userToken: cleanToken,
     }
   }
 
-  throw new Error('Could not find any Facebook Pages associated with this token. Please ensure the token has pages_manage_posts and pages_read_engagement permissions.')
+  throw new Error('Could not find any Facebook Pages associated with this token.')
 }
 
 /**
