@@ -303,7 +303,7 @@ export async function resolveLinkedInConnection(
 
 /**
  * Publish a Post directly to LinkedIn (Organization or Member)
- * Tries modern REST API with dynamic active versions, fallback to /v2/ugcPosts, and fallback to /v2/shares
+ * Tries modern REST API with active versions, fallback to /v2/ugcPosts, and fallback to member profile if org lacks scope
  */
 export async function postLinkedInShare(
   accessToken: string,
@@ -311,166 +311,171 @@ export async function postLinkedInShare(
   text: string
 ): Promise<{ id: string }> {
   const cleanToken = accessToken.trim()
-  const cleanAuthor = authorUrn.startsWith('urn:li:') ? authorUrn : `urn:li:organization:${authorUrn}`
 
-  // Strategy A: LinkedIn Versioned Posts REST API with dynamic active versions
-  const now = new Date()
-  const candidateVersions: string[] = []
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    candidateVersions.push(`${y}${m}`)
-  }
-  const fallbackVersions = ['202502', '202501', '202412', '202411', '202410', '202409', '202408']
-  for (const v of fallbackVersions) {
-    if (!candidateVersions.includes(v)) candidateVersions.push(v)
+  // Active LinkedIn REST API versions currently supported by LinkedIn
+  const candidateVersions = [
+    '202502',
+    '202501',
+    '202412',
+    '202411',
+    '202410',
+    '202409',
+    '202408',
+    '202407',
+    '202406',
+    '202405',
+    '202404',
+    '202403',
+  ]
+
+  // Resolve author URN options (primary target, plus personal member fallback)
+  const authorsToTry: string[] = []
+  if (authorUrn && authorUrn.trim()) {
+    const raw = authorUrn.trim()
+    const formatted = raw.startsWith('urn:li:')
+      ? raw
+      : /^\d+$/.test(raw)
+        ? `urn:li:organization:${raw}`
+        : `urn:li:person:${raw}`
+    authorsToTry.push(formatted)
   }
 
-  const restUrl = 'https://api.linkedin.com/rest/posts'
-  const restBody = {
-    author: cleanAuthor,
-    commentary: text,
-    visibility: 'PUBLIC',
-    distribution: {
-      feedDistribution: 'MAIN_FEED',
-      targetEntities: [],
-      thirdPartyDistributionChannels: [],
-    },
-    lifecycleState: 'PUBLISHED',
-    isReshareDisabledByAuthor: false,
+  // Fetch authenticated personal member URN as fallback
+  let memberUrn: string | null = null
+  try {
+    const userinfoRes = await fetch('https://api.linkedin.com/v2/userinfo', {
+      headers: { Authorization: `Bearer ${cleanToken}` },
+    })
+    if (userinfoRes.ok) {
+      const uData = await userinfoRes.json()
+      if (uData.sub) {
+        memberUrn = `urn:li:person:${uData.sub}`
+      }
+    }
+  } catch {}
+
+  if (!memberUrn) {
+    try {
+      const meRes = await fetch('https://api.linkedin.com/v2/me', {
+        headers: { Authorization: `Bearer ${cleanToken}` },
+      })
+      if (meRes.ok) {
+        const mData = await meRes.json()
+        if (mData.id) memberUrn = `urn:li:person:${mData.id}`
+      }
+    } catch {}
+  }
+
+  if (memberUrn && !authorsToTry.includes(memberUrn)) {
+    authorsToTry.push(memberUrn)
+  }
+
+  if (authorsToTry.length === 0) {
+    authorsToTry.push('urn:li:organization:74760541')
   }
 
   let lastError = ''
 
-  for (const version of candidateVersions) {
+  for (const currentAuthor of authorsToTry) {
+    // Strategy A: LinkedIn Versioned Posts REST API
+    const restUrl = 'https://api.linkedin.com/rest/posts'
+    const restBody = {
+      author: currentAuthor,
+      commentary: text,
+      visibility: 'PUBLIC',
+      distribution: {
+        feedDistribution: 'MAIN_FEED',
+        targetEntities: [],
+        thirdPartyDistributionChannels: [],
+      },
+      lifecycleState: 'PUBLISHED',
+      isReshareDisabledByAuthor: false,
+    }
+
+    for (const version of candidateVersions) {
+      try {
+        const res = await fetch(restUrl, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+            'Content-Type': 'application/json',
+            'LinkedIn-Version': version,
+            'X-Restli-Protocol-Version': '2.0.0',
+          },
+          body: JSON.stringify(restBody),
+        })
+
+        if (res.status === 201 || res.ok) {
+          const postId = res.headers.get('x-restli-id') || res.headers.get('x-linkedin-id')
+          if (postId) return { id: postId }
+          try {
+            const json = await res.json()
+            if (json.id) return { id: json.id }
+          } catch {}
+          return { id: `urn:li:share:${Date.now()}` }
+        }
+
+        const errText = await res.text()
+        try {
+          const parsed = JSON.parse(errText)
+          lastError = parsed.message || errText
+        } catch {
+          lastError = errText
+        }
+
+        // If error is not version-related, don't cycle versions
+        if (!lastError.toLowerCase().includes('not active') && !lastError.toLowerCase().includes('version')) {
+          break
+        }
+      } catch (fetchErr) {
+        lastError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
+      }
+    }
+
+    // Strategy B: Fallback to /v2/ugcPosts
     try {
-      const res = await fetch(restUrl, {
+      const ugcUrl = 'https://api.linkedin.com/v2/ugcPosts'
+      const ugcBody = {
+        author: currentAuthor,
+        lifecycleState: 'PUBLISHED',
+        specificContent: {
+          'com.linkedin.ugc.ShareContent': {
+            shareCommentary: {
+              text,
+            },
+            shareMediaCategory: 'NONE',
+          },
+        },
+        visibility: {
+          'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
+        },
+      }
+
+      const ugcRes = await fetch(ugcUrl, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${cleanToken}`,
           'Content-Type': 'application/json',
-          'LinkedIn-Version': version,
           'X-Restli-Protocol-Version': '2.0.0',
         },
-        body: JSON.stringify(restBody),
+        body: JSON.stringify(ugcBody),
       })
 
-      if (res.status === 201 || res.ok) {
-        const postId = res.headers.get('x-restli-id') || res.headers.get('x-linkedin-id')
-        if (postId) return { id: postId }
+      if (ugcRes.ok || ugcRes.status === 201) {
+        const ugcData = await ugcRes.json()
+        if (ugcData.id) return { id: ugcData.id }
+        const ugcHeaderId = ugcRes.headers.get('x-restli-id') || ugcRes.headers.get('x-linkedin-id')
+        if (ugcHeaderId) return { id: ugcHeaderId }
+      } else {
+        const ugcErrText = await ugcRes.text()
         try {
-          const json = await res.json()
-          if (json.id) return { id: json.id }
+          const parsedUgc = JSON.parse(ugcErrText)
+          if (parsedUgc.message) lastError = parsedUgc.message
         } catch {}
-        return { id: `urn:li:share:${Date.now()}` }
       }
-
-      const errText = await res.text()
-      try {
-        const parsed = JSON.parse(errText)
-        lastError = parsed.message || errText
-      } catch {
-        lastError = errText
-      }
-
-      // If error is NOT about inactive version, don't keep cycling all versions endlessly
-      if (!lastError.toLowerCase().includes('not active') && !lastError.toLowerCase().includes('version')) {
-        break
-      }
-    } catch (fetchErr) {
-      lastError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
+    } catch (ugcErr) {
+      console.warn('LinkedIn /v2/ugcPosts error:', ugcErr)
     }
-  }
-
-  // Strategy B: Fallback to /v2/ugcPosts
-  try {
-    const ugcUrl = 'https://api.linkedin.com/v2/ugcPosts'
-    const ugcBody = {
-      author: cleanAuthor,
-      lifecycleState: 'PUBLISHED',
-      specificContent: {
-        'com.linkedin.ugc.ShareContent': {
-          shareCommentary: {
-            text,
-          },
-          shareMediaCategory: 'NONE',
-        },
-      },
-      visibility: {
-        'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
-      },
-    }
-
-    const ugcRes = await fetch(ugcUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cleanToken}`,
-        'Content-Type': 'application/json',
-        'X-Restli-Protocol-Version': '2.0.0',
-      },
-      body: JSON.stringify(ugcBody),
-    })
-
-    if (ugcRes.ok || ugcRes.status === 201) {
-      const ugcData = await ugcRes.json()
-      if (ugcData.id) {
-        return { id: ugcData.id }
-      }
-      const ugcHeaderId = ugcRes.headers.get('x-restli-id') || ugcRes.headers.get('x-linkedin-id')
-      if (ugcHeaderId) return { id: ugcHeaderId }
-    } else {
-      const ugcErrText = await ugcRes.text()
-      try {
-        const parsedUgc = JSON.parse(ugcErrText)
-        if (parsedUgc.message) lastError = parsedUgc.message
-      } catch {}
-    }
-  } catch (ugcErr) {
-    console.warn('LinkedIn /v2/ugcPosts error:', ugcErr)
-  }
-
-  // Strategy C: Fallback to /v2/shares
-  try {
-    const sharesUrl = 'https://api.linkedin.com/v2/shares'
-    const sharesBody = {
-      owner: cleanAuthor,
-      text: {
-        text,
-      },
-      distribution: {
-        linkedInDistributionTarget: {
-          visibleToGuest: true,
-        },
-      },
-    }
-
-    const sharesRes = await fetch(sharesUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cleanToken}`,
-        'Content-Type': 'application/json',
-        'X-Restli-Protocol-Version': '2.0.0',
-      },
-      body: JSON.stringify(sharesBody),
-    })
-
-    if (sharesRes.ok || sharesRes.status === 201) {
-      const sharesData = await sharesRes.json()
-      if (sharesData.id) {
-        return { id: sharesData.id }
-      }
-      const sharesHeaderId = sharesRes.headers.get('x-restli-id') || sharesRes.headers.get('x-linkedin-id')
-      if (sharesHeaderId) return { id: sharesHeaderId }
-    } else {
-      const sharesErrText = await sharesRes.text()
-      try {
-        const parsedShares = JSON.parse(sharesErrText)
-        if (parsedShares.message) lastError = parsedShares.message
-      } catch {}
-    }
-  } catch (sharesErr) {
-    console.warn('LinkedIn /v2/shares error:', sharesErr)
   }
 
   throw new Error(`LinkedIn post failed: ${lastError || 'Unknown LinkedIn API error'}`)
