@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { rewritePost } from '@/lib/deepseek'
 import { scheduleBufferPost } from '@/lib/buffer'
@@ -39,8 +40,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+
     // Only approvers/admins can act on posts
-    const { data: profile } = await supabase
+    const { data: profile } = await db
       .from('profiles')
       .select('role, facebook_provider, twitter_provider, linkedin_provider')
       .eq('id', user.id)
@@ -59,7 +62,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Creators can only edit their own pending posts
     if (action === 'edit') {
-      const { data: post } = await supabase
+      const { data: post } = await db
         .from('posts')
         .select('user_id, status')
         .eq('id', id)
@@ -75,7 +78,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('posts')
         .update({ content: parsed.data.content })
         .eq('id', id)
@@ -102,7 +105,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         updates.scheduled_at = parsed.data.scheduled_at
       }
 
-      const { data: postData, error } = await supabase
+      const { data: postData, error } = await db
         .from('posts')
         .update(updates)
         .eq('id', id)
@@ -124,19 +127,29 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
         if (platform === 'facebook' && fbProvider === 'facebook_api') {
           // Direct Facebook API Auto-Scheduling
-          let { data: fbConn } = await supabase
+          let { data: fbConn } = await db
             .from('facebook_connections')
             .select('*')
             .eq('user_id', user.id)
             .single()
 
           if (!fbConn) {
-            const { data: authorConn } = await supabase
+            const { data: authorConn } = await db
               .from('facebook_connections')
               .select('*')
               .eq('user_id', post.user_id)
               .single()
             if (authorConn) fbConn = authorConn
+          }
+
+          if (!fbConn) {
+            const { data: anyConn } = await db
+              .from('facebook_connections')
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            if (anyConn) fbConn = anyConn
           }
 
           if (fbConn && fbConn.page_access_token && fbConn.page_id) {
@@ -147,7 +160,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
               post.scheduled_at
             )
 
-            const { data: updatedPost, error: updateErr } = await supabase
+            const { data: updatedPost, error: updateErr } = await db
               .from('posts')
               .update({
                 status: fbResult.isScheduled ? 'scheduled' : 'published',
@@ -167,14 +180,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           }
         } else if (platform === 'twitter' && twProvider === 'twitter_api') {
           // Direct Twitter API Auto-Publishing
-          let { data: twConn } = await supabase
+          let { data: twConn } = await db
             .from('twitter_connections')
             .select('*')
             .eq('user_id', user.id)
             .single()
 
           if (!twConn) {
-            const { data: authorConn } = await supabase
+            const { data: authorConn } = await db
               .from('twitter_connections')
               .select('*')
               .eq('user_id', post.user_id)
@@ -182,9 +195,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             if (authorConn) twConn = authorConn
           }
 
+          if (!twConn) {
+            const { data: anyConn } = await db
+              .from('twitter_connections')
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            if (anyConn) twConn = anyConn
+          }
+
           if (twConn && twConn.access_token) {
             const twResult = await postTweet(twConn.access_token, post.content)
-            const { data: updatedPost, error: updateErr } = await supabase
+            const { data: updatedPost, error: updateErr } = await db
               .from('posts')
               .update({
                 status: 'published',
@@ -204,14 +227,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           }
         } else if (platform === 'linkedin' && liProvider === 'linkedin_api') {
           // Direct LinkedIn API Auto-Publishing
-          let { data: liConn } = await supabase
+          let { data: liConn } = await db
             .from('linkedin_connections')
             .select('*')
             .eq('user_id', user.id)
             .single()
 
           if (!liConn) {
-            const { data: authorConn } = await supabase
+            const { data: authorConn } = await db
               .from('linkedin_connections')
               .select('*')
               .eq('user_id', post.user_id)
@@ -219,9 +242,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             if (authorConn) liConn = authorConn
           }
 
+          if (!liConn) {
+            const { data: anyConn } = await db
+              .from('linkedin_connections')
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            if (anyConn) liConn = anyConn
+          }
+
           if (liConn && liConn.access_token && liConn.account_id) {
             const liResult = await postLinkedInShare(liConn.access_token, liConn.account_id, post.content)
-            const { data: updatedPost, error: updateErr } = await supabase
+            const { data: updatedPost, error: updateErr } = await db
               .from('posts')
               .update({
                 status: 'published',
@@ -241,7 +274,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           }
         } else {
           // Buffer Auto-Scheduling Fallback
-          let { data: bufferConn } = await supabase
+          let { data: bufferConn } = await db
             .from('buffer_connections')
             .select('*')
             .eq('user_id', user.id)
@@ -252,7 +285,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             : undefined
 
           if (!profileId) {
-            const { data: authorConn } = await supabase
+            const { data: authorConn } = await db
               .from('buffer_connections')
               .select('*')
               .eq('user_id', post.user_id)
@@ -260,6 +293,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
             if (authorConn) {
               bufferConn = authorConn
               profileId = (authorConn.profile_ids as Record<string, string>)[platform]
+            }
+          }
+
+          if (!profileId) {
+            const { data: anyConn } = await db
+              .from('buffer_connections')
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            if (anyConn) {
+              bufferConn = anyConn
+              profileId = (anyConn.profile_ids as Record<string, string>)[platform]
             }
           }
 
@@ -272,7 +318,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
               platform
             )
 
-            const { data: updatedPost, error: updateErr } = await supabase
+            const { data: updatedPost, error: updateErr } = await db
               .from('posts')
               .update({
                 status: 'scheduled',
@@ -299,7 +345,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     if (action === 'rewrite') {
-      const { data: post } = await supabase
+      const { data: post } = await db
         .from('posts')
         .select('*')
         .eq('id', id)
@@ -321,7 +367,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         parsed.data.instruction
       )
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('posts')
         .update({ content: rewritten })
         .eq('id', id)
@@ -333,7 +379,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     if (action === 'reject') {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('posts')
         .update({
           status: 'rejected',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getPostMetrics as getBufferPostMetrics } from '@/lib/buffer'
 import { getFacebookPostMetrics } from '@/lib/facebook'
 import { getTwitterPostMetrics } from '@/lib/twitter'
@@ -11,7 +12,9 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+
+    const { data: profile } = await db
       .from('profiles')
       .select('role')
       .eq('id', user.id)
@@ -20,7 +23,7 @@ export async function POST(request: NextRequest) {
     const isSuperAdmin = profile?.role === 'super_admin'
 
     // Fetch posts that have been pushed to Buffer, Facebook, Twitter, or LinkedIn
-    let postsQuery = supabase
+    let postsQuery = db
       .from('posts')
       .select('id, user_id, buffer_post_id, facebook_post_id, twitter_post_id, linkedin_post_id, published_provider')
       .or('buffer_post_id.not.is.null,facebook_post_id.not.is.null,twitter_post_id.not.is.null,linkedin_post_id.not.is.null')
@@ -46,19 +49,19 @@ export async function POST(request: NextRequest) {
 
     if (userIds.length > 0) {
       const [bufferRes, fbRes, twRes, liRes] = await Promise.all([
-        supabase
+        db
           .from('buffer_connections')
           .select('user_id, access_token')
           .in('user_id', userIds),
-        supabase
+        db
           .from('facebook_connections')
           .select('user_id, page_access_token')
           .in('user_id', userIds),
-        supabase
+        db
           .from('twitter_connections')
           .select('user_id, access_token')
           .in('user_id', userIds),
-        supabase
+        db
           .from('linkedin_connections')
           .select('user_id, access_token')
           .in('user_id', userIds),
@@ -119,7 +122,7 @@ export async function POST(request: NextRequest) {
             return
           }
 
-          await supabase
+          await db
             .from('posts')
             .update({
               metrics: {

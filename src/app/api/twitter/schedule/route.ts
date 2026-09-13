@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { postTweet, refreshTwitterToken } from '@/lib/twitter'
 import { z } from 'zod'
 
@@ -13,7 +14,9 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: profile } = await supabase
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+
+    const { data: profile } = await db
       .from('profiles')
       .select('role')
       .eq('id', user.id)
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest) {
     const { postId } = parsed.data
 
     // Fetch post
-    const { data: post } = await supabase
+    const { data: post } = await db
       .from('posts')
       .select('*')
       .eq('id', postId)
@@ -49,19 +52,29 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch Twitter connection
-    let { data: twConn } = await supabase
+    let { data: twConn } = await db
       .from('twitter_connections')
       .select('*')
       .eq('user_id', user.id)
       .single()
 
     if (!twConn) {
-      const { data: authorConn } = await supabase
+      const { data: authorConn } = await db
         .from('twitter_connections')
         .select('*')
         .eq('user_id', post.user_id)
         .single()
       if (authorConn) twConn = authorConn
+    }
+
+    if (!twConn) {
+      const { data: anyConn } = await db
+        .from('twitter_connections')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (anyConn) twConn = anyConn
     }
 
     if (!twConn || !twConn.access_token) {
@@ -78,7 +91,7 @@ export async function POST(request: NextRequest) {
         const refreshed = await refreshTwitterToken(twConn.refresh_token)
         activeToken = refreshed.accessToken
         const newExpiry = new Date(Date.now() + refreshed.expiresIn * 1000).toISOString()
-        await supabase
+        await db
           .from('twitter_connections')
           .update({
             access_token: refreshed.accessToken,
@@ -107,7 +120,7 @@ export async function POST(request: NextRequest) {
       updateData.scheduled_at = post.scheduled_at || new Date().toISOString()
     }
 
-    await supabase.from('posts').update(updateData).eq('id', postId)
+    await db.from('posts').update(updateData).eq('id', postId)
 
     return NextResponse.json({
       success: true,
