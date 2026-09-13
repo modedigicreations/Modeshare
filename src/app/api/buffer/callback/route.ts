@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { exchangeBufferCode, getBufferProfiles, findProfileId } from '@/lib/buffer'
 import { Platform } from '@/types/database'
 
@@ -68,7 +69,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Upsert the buffer connection
-    const { error: upsertError } = await supabase.from('buffer_connections').upsert(
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { error: upsertError } = await db.from('buffer_connections').upsert(
       {
         user_id: user.id,
         access_token: accessToken,

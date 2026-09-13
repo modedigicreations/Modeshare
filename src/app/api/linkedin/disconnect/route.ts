@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST() {
   try {
@@ -7,7 +8,8 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { error } = await supabase
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { error } = await db
       .from('linkedin_connections')
       .delete()
       .eq('user_id', user.id)
@@ -17,7 +19,7 @@ export async function POST() {
     }
 
     // Reset linkedin_provider to buffer if it was linkedin_api
-    await supabase
+    await db
       .from('profiles')
       .update({ linkedin_provider: 'buffer' })
       .eq('id', user.id)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { exchangeTwitterCode } from '@/lib/twitter'
 import { cookies } from 'next/headers'
 
@@ -51,7 +52,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Upsert into twitter_connections
-    const { error: upsertErr } = await supabase.from('twitter_connections').upsert(
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { error: upsertErr } = await db.from('twitter_connections').upsert(
       {
         user_id: user.id,
         access_token: tokenResult.accessToken,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveFacebookConnection } from '@/lib/facebook'
 import { z } from 'zod'
 
@@ -36,7 +37,8 @@ export async function POST(request: NextRequest) {
     const selectedPage = result.pages[0]
 
     // 2. Upsert facebook_connections with the permanent page access token
-    const { error: upsertError } = await supabase.from('facebook_connections').upsert(
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { error: upsertError } = await db.from('facebook_connections').upsert(
       {
         user_id: user.id,
         access_token: result.userToken,

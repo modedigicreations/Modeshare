@@ -138,7 +138,7 @@ export async function getLinkedInPages(accessToken: string): Promise<LinkedInAcc
   const cleanToken = accessToken.trim()
   const accounts: LinkedInAccountOption[] = []
 
-  // 1. Fetch personal profile identity (OpenID userinfo)
+  // 1. Fetch personal profile identity via OpenID userinfo
   try {
     const userinfoRes = await fetch('https://api.linkedin.com/v2/userinfo', {
       headers: { Authorization: `Bearer ${cleanToken}` },
@@ -157,46 +157,74 @@ export async function getLinkedInPages(accessToken: string): Promise<LinkedInAcc
     console.warn('LinkedIn userinfo fetch warning:', err)
   }
 
+  // 1b. Fallback to /v2/me for older/classic OAuth tokens
+  if (accounts.length === 0) {
+    try {
+      const meRes = await fetch('https://api.linkedin.com/v2/me', {
+        headers: { Authorization: `Bearer ${cleanToken}` },
+      })
+      if (meRes.ok) {
+        const meData = await meRes.json()
+        if (meData.id) {
+          const fullName = `${meData.localizedFirstName || ''} ${meData.localizedLastName || ''}`.trim() || 'LinkedIn Member'
+          accounts.push({
+            id: `urn:li:person:${meData.id}`,
+            name: fullName,
+            type: 'person',
+          })
+        }
+      }
+    } catch (meErr) {
+      console.warn('LinkedIn /v2/me fetch warning:', meErr)
+    }
+  }
+
   // 2. Fetch organizational pages (Company Pages)
   try {
-    const aclsUrl = 'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&state=APPROVED'
-    const aclsRes = await fetch(aclsUrl, {
-      headers: {
-        Authorization: `Bearer ${cleanToken}`,
-        'X-Restli-Protocol-Version': '2.0.0',
-      },
-    })
+    const aclsUrls = [
+      'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&state=APPROVED',
+      'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee',
+    ]
 
-    if (aclsRes.ok) {
-      const aclsData = await aclsRes.json()
-      if (Array.isArray(aclsData.elements)) {
-        for (const element of aclsData.elements) {
-          const orgUrn = element.organizationalTarget
-          if (orgUrn && !accounts.some((a) => a.id === orgUrn)) {
-            // Fetch organization details (name)
-            let orgName = 'LinkedIn Company Page'
-            try {
-              const orgId = orgUrn.replace('urn:li:organization:', '').replace('urn:li:organizationBrand:', '')
-              const orgDetailsRes = await fetch(`https://api.linkedin.com/v2/organizations/${orgId}`, {
-                headers: {
-                  Authorization: `Bearer ${cleanToken}`,
-                  'X-Restli-Protocol-Version': '2.0.0',
-                },
-              })
-              if (orgDetailsRes.ok) {
-                const orgDetails = await orgDetailsRes.json()
-                if (orgDetails.localizedName) {
-                  orgName = orgDetails.localizedName
+    for (const aclsUrl of aclsUrls) {
+      const aclsRes = await fetch(aclsUrl, {
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+      })
+
+      if (aclsRes.ok) {
+        const aclsData = await aclsRes.json()
+        if (Array.isArray(aclsData.elements) && aclsData.elements.length > 0) {
+          for (const element of aclsData.elements) {
+            const orgUrn = element.organizationalTarget
+            if (orgUrn && !accounts.some((a) => a.id === orgUrn)) {
+              let orgName = 'LinkedIn Company Page'
+              try {
+                const orgId = orgUrn.replace('urn:li:organization:', '').replace('urn:li:organizationBrand:', '')
+                const orgDetailsRes = await fetch(`https://api.linkedin.com/v2/organizations/${orgId}`, {
+                  headers: {
+                    Authorization: `Bearer ${cleanToken}`,
+                    'X-Restli-Protocol-Version': '2.0.0',
+                  },
+                })
+                if (orgDetailsRes.ok) {
+                  const orgDetails = await orgDetailsRes.json()
+                  if (orgDetails.localizedName) {
+                    orgName = orgDetails.localizedName
+                  }
                 }
-              }
-            } catch {}
+              } catch {}
 
-            accounts.push({
-              id: orgUrn,
-              name: orgName,
-              type: 'organization',
-            })
+              accounts.push({
+                id: orgUrn,
+                name: orgName,
+                type: 'organization',
+              })
+            }
           }
+          break // Found pages successfully
         }
       }
     }
@@ -218,8 +246,8 @@ export async function resolveLinkedInConnection(
   selectedAccount: LinkedInAccountOption
 }> {
   const cleanToken = accessToken.trim()
-  const accounts = await getLinkedInPages(cleanToken)
 
+  // If explicit account ID / Organization ID was provided, prioritize direct linkage
   if (explicitAccountId && explicitAccountId.trim()) {
     const rawId = explicitAccountId.trim()
     const formattedUrn = rawId.startsWith('urn:li:')
@@ -228,38 +256,44 @@ export async function resolveLinkedInConnection(
         ? `urn:li:organization:${rawId}`
         : `urn:li:person:${rawId}`
 
-    const found = accounts.find((a) => a.id === formattedUrn || a.id.includes(rawId))
-    if (found) {
-      return { accounts, selectedAccount: found }
-    }
-
-    // Direct organization resolution
-    const directAccount: LinkedInAccountOption = {
-      id: formattedUrn,
-      name: formattedUrn.includes('organization') ? 'LinkedIn Organization' : 'LinkedIn Profile',
-      type: formattedUrn.includes('organization') ? 'organization' : 'person',
-    }
-    return { accounts: [directAccount, ...accounts], selectedAccount: directAccount }
-  }
-
-  if (accounts.length === 0) {
-    // If endpoints couldn't return accounts, verify token via userinfo
+    // Try fetching page name if available
+    let name = formattedUrn.includes('organization') ? `LinkedIn Organization (${rawId})` : `LinkedIn Member (${rawId})`
     try {
-      const userinfoRes = await fetch('https://api.linkedin.com/v2/userinfo', {
-        headers: { Authorization: `Bearer ${cleanToken}` },
-      })
-      if (userinfoRes.ok) {
-        const userData = await userinfoRes.json()
-        const profileAccount: LinkedInAccountOption = {
-          id: `urn:li:person:${userData.sub}`,
-          name: userData.name || 'LinkedIn Member',
-          type: 'person',
+      if (formattedUrn.includes('organization')) {
+        const orgId = formattedUrn.replace('urn:li:organization:', '').replace('urn:li:organizationBrand:', '')
+        const orgDetailsRes = await fetch(`https://api.linkedin.com/v2/organizations/${orgId}`, {
+          headers: {
+            Authorization: `Bearer ${cleanToken}`,
+            'X-Restli-Protocol-Version': '2.0.0',
+          },
+        })
+        if (orgDetailsRes.ok) {
+          const orgDetails = await orgDetailsRes.json()
+          if (orgDetails.localizedName) {
+            name = orgDetails.localizedName
+          }
         }
-        return { accounts: [profileAccount], selectedAccount: profileAccount }
       }
     } catch {}
 
-    throw new Error('Invalid LinkedIn Access Token or no LinkedIn profile/organization found.')
+    const directAccount: LinkedInAccountOption = {
+      id: formattedUrn,
+      name,
+      type: formattedUrn.includes('organization') ? 'organization' : 'person',
+    }
+
+    return {
+      accounts: [directAccount],
+      selectedAccount: directAccount,
+    }
+  }
+
+  const accounts = await getLinkedInPages(cleanToken)
+
+  if (accounts.length === 0) {
+    throw new Error(
+      'Could not automatically detect LinkedIn Company Pages with this token. Please enter your LinkedIn Organization ID in the field below (e.g., from your company URL linkedin.com/company/12345678) or use 1-click OAuth connect.'
+    )
   }
 
   // Prefer organization page over personal profile if available

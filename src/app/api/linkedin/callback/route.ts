@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { exchangeLinkedInCode, resolveLinkedInConnection } from '@/lib/linkedin'
 import { cookies } from 'next/headers'
 
@@ -45,7 +46,8 @@ export async function GET(request: NextRequest) {
       expiresAt = new Date(Date.now() + tokenResult.expiresIn * 1000).toISOString()
     }
 
-    const { error: upsertErr } = await supabase.from('linkedin_connections').upsert(
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { error: upsertErr } = await db.from('linkedin_connections').upsert(
       {
         user_id: user.id,
         access_token: tokenResult.accessToken,

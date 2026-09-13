@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { resolveLinkedInConnection } from '@/lib/linkedin'
 import { z } from 'zod'
 
@@ -26,7 +27,8 @@ export async function POST(request: NextRequest) {
     const resolved = await resolveLinkedInConnection(accessToken, accountId)
     const targetAccount = resolved.selectedAccount
 
-    const { error: upsertError } = await supabase.from('linkedin_connections').upsert(
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { error: upsertError } = await db.from('linkedin_connections').upsert(
       {
         user_id: user.id,
         access_token: accessToken.trim(),

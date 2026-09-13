@@ -344,7 +344,7 @@ CREATE POLICY "twitter_insert_own" ON public.twitter_connections
 
 DROP POLICY IF EXISTS "twitter_update_own" ON public.twitter_connections;
 CREATE POLICY "twitter_update_own" ON public.twitter_connections
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "twitter_delete_own" ON public.twitter_connections;
 CREATE POLICY "twitter_delete_own" ON public.twitter_connections
@@ -365,7 +365,7 @@ CREATE POLICY "linkedin_insert_own" ON public.linkedin_connections
 
 DROP POLICY IF EXISTS "linkedin_update_own" ON public.linkedin_connections;
 CREATE POLICY "linkedin_update_own" ON public.linkedin_connections
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 DROP POLICY IF EXISTS "linkedin_delete_own" ON public.linkedin_connections;
 CREATE POLICY "linkedin_delete_own" ON public.linkedin_connections

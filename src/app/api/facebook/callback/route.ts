@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { exchangeFacebookCode, getFacebookPages } from '@/lib/facebook'
 
 function getRequestOrigin(request: NextRequest): string {
@@ -61,7 +62,8 @@ export async function GET(request: NextRequest) {
     const selectedPage = pages[0]
 
     // 3. Upsert facebook_connections
-    const { error: upsertError } = await supabase.from('facebook_connections').upsert(
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { error: upsertError } = await db.from('facebook_connections').upsert(
       {
         user_id: user.id,
         access_token: userAccessToken,
