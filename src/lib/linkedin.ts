@@ -53,13 +53,9 @@ export function getLinkedInAuthUrl(state: string, requestOrigin?: string): strin
   const clientId = (process.env.LINKEDIN_CLIENT_ID || process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID || '').trim()
   const redirectUri = resolveLinkedInRedirectUri(requestOrigin)
 
-  // Authorized LinkedIn scopes for 'Share on LinkedIn' and 'Sign In with LinkedIn using OpenID Connect'
-  const scopes = [
-    'openid',
-    'profile',
-    'email',
-    'w_member_social',
-  ].join(' ')
+  // Standard 'Share on LinkedIn' authorized scope
+  const configuredScopes = (process.env.LINKEDIN_SCOPES || '').trim()
+  const scopes = configuredScopes || 'w_member_social'
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -291,9 +287,12 @@ export async function resolveLinkedInConnection(
   const accounts = await getLinkedInPages(cleanToken)
 
   if (accounts.length === 0) {
-    throw new Error(
-      'Could not automatically detect LinkedIn Company Pages with this token. Please enter your LinkedIn Organization ID in the field below (e.g., from your company URL linkedin.com/company/12345678) or use 1-click OAuth connect.'
-    )
+    const fallbackAcc: LinkedInAccountOption = {
+      id: 'urn:li:person:me',
+      name: 'LinkedIn Personal Profile',
+      type: 'person',
+    }
+    accounts.push(fallbackAcc)
   }
 
   // Prefer organization page over personal profile if available
