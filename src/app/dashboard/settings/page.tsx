@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Settings, CheckCircle2, AlertCircle, ExternalLink, Sliders } from 'lucide-react'
 import BufferConnectButton from './BufferConnectButton'
@@ -23,17 +24,19 @@ export default async function SettingsPage({ searchParams }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login?error=' + encodeURIComponent('No user session in SettingsPage'))
 
-  const { data: profile } = await supabase
+  const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+
+  const { data: profile } = await db
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
   const [bufferRes, fbRes, twRes, liRes] = await Promise.all([
-    supabase.from('buffer_connections').select('*').eq('user_id', user.id).single(),
-    supabase.from('facebook_connections').select('*').eq('user_id', user.id).single(),
-    supabase.from('twitter_connections').select('*').eq('user_id', user.id).single(),
-    supabase.from('linkedin_connections').select('*').eq('user_id', user.id).single(),
+    db.from('buffer_connections').select('*').eq('user_id', user.id).single(),
+    db.from('facebook_connections').select('*').eq('user_id', user.id).single(),
+    db.from('twitter_connections').select('*').eq('user_id', user.id).single(),
+    db.from('linkedin_connections').select('*').eq('user_id', user.id).single(),
   ])
 
   const bufferConn = bufferRes.data

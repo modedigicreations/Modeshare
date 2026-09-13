@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getLinkedInPages } from '@/lib/linkedin'
 import { z } from 'zod'
 
@@ -13,7 +14,8 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data: conn } = await supabase
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { data: conn } = await db
       .from('linkedin_connections')
       .select('*')
       .eq('user_id', user.id)
@@ -54,7 +56,8 @@ export async function POST(request: NextRequest) {
 
     const { accountId } = parsed.data
 
-    const { data: conn } = await supabase
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
+    const { data: conn } = await db
       .from('linkedin_connections')
       .select('*')
       .eq('user_id', user.id)
@@ -65,13 +68,13 @@ export async function POST(request: NextRequest) {
     }
 
     const accounts = await getLinkedInPages(conn.access_token)
-    const targetAccount = accounts.find((a) => a.id === accountId)
-
-    if (!targetAccount) {
-      return NextResponse.json({ error: 'Account not found in your LinkedIn account' }, { status: 404 })
+    const targetAccount = accounts.find((a) => a.id === accountId) || {
+      id: accountId,
+      name: accountId.includes('organization') ? 'LinkedIn Organization' : 'LinkedIn Profile',
+      type: accountId.includes('organization') ? ('organization' as const) : ('person' as const),
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from('linkedin_connections')
       .update({
         account_id: targetAccount.id,
