@@ -489,10 +489,47 @@ export async function postLinkedInShare(
     } catch (ugcErr) {
       console.warn('LinkedIn /v2/ugcPosts error:', ugcErr)
     }
-  }
 
-  if (lastError.includes('/author')) {
-    lastError = 'LinkedIn rejected publishing to Organization. Ensure your LinkedIn App has Community Management permissions in developer.linkedin.com, or switch your active LinkedIn account to Personal Profile in Settings.'
+    // Strategy C: Fallback to /v2/shares
+    try {
+      const sharesUrl = 'https://api.linkedin.com/v2/shares'
+      const sharesBody = {
+        owner: currentAuthor,
+        text: {
+          text,
+        },
+        distribution: {
+          linkedInDistributionTarget: {
+            visibleToGuest: true,
+          },
+        },
+      }
+
+      const sharesRes = await fetch(sharesUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${cleanToken}`,
+          'Content-Type': 'application/json',
+          'X-Restli-Protocol-Version': '2.0.0',
+        },
+        body: JSON.stringify(sharesBody),
+      })
+
+      if (sharesRes.ok || sharesRes.status === 201) {
+        const sharesData = await sharesRes.json()
+        if (sharesData.id) return { id: sharesData.id }
+        const sharesHeaderId = sharesRes.headers.get('x-restli-id') || sharesRes.headers.get('x-linkedin-id')
+        if (sharesHeaderId) return { id: sharesHeaderId }
+      } else {
+        const sharesErrText = await sharesRes.text()
+        try {
+          const parsedShares = JSON.parse(sharesErrText)
+          if (parsedShares.message) lastError = parsedShares.message
+        } catch {}
+      }
+    } catch (sharesErr) {
+      console.warn('LinkedIn /v2/shares error:', sharesErr)
+    }
   }
 
   throw new Error(`LinkedIn post failed: ${lastError || 'Unknown LinkedIn API error'}`)
