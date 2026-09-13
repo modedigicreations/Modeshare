@@ -267,6 +267,10 @@ export async function postTweet(
         msg = parsed.detail || parsed.title
       }
     } catch {}
+
+    if (msg.toLowerCase().includes('credits depleted')) {
+      msg = 'Twitter API Monthly Post Limit reached ("credits depleted"). Check your usage on developer.x.com or switch Twitter provider to Buffer in Settings.'
+    }
     throw new Error(`Twitter post failed: ${msg}`)
   }
 
