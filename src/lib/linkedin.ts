@@ -53,12 +53,14 @@ export function getLinkedInAuthUrl(state: string, requestOrigin?: string): strin
   const clientId = (process.env.LINKEDIN_CLIENT_ID || process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID || '').trim()
   const redirectUri = resolveLinkedInRedirectUri(requestOrigin)
 
-  // Standard LinkedIn scopes available to all Developer Apps with 'Share on LinkedIn' and 'Sign In with LinkedIn'
+  // Comprehensive scopes for Member + Company Page (Community Management API)
   const scopes = [
     'openid',
     'profile',
     'email',
     'w_member_social',
+    'w_organization_social',
+    'r_organization_social',
   ].join(' ')
 
   const params = new URLSearchParams({
