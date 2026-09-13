@@ -53,9 +53,9 @@ export function getLinkedInAuthUrl(state: string, requestOrigin?: string): strin
   const clientId = (process.env.LINKEDIN_CLIENT_ID || process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID || '').trim()
   const redirectUri = resolveLinkedInRedirectUri(requestOrigin)
 
-  // Standard 'Share on LinkedIn' authorized scope
+  // Standard OpenID Connect + Share scopes (Sign In with LinkedIn using OpenID Connect + Share on LinkedIn)
   const configuredScopes = (process.env.LINKEDIN_SCOPES || '').trim()
-  const scopes = configuredScopes || 'w_member_social'
+  const scopes = configuredScopes || 'openid profile email w_member_social'
 
   const params = new URLSearchParams({
     response_type: 'code',
