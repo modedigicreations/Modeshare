@@ -24,10 +24,10 @@ const LINKEDIN_API_VERSION = '202401'
  */
 export function resolveLinkedInRedirectUri(requestOrigin?: string): string {
   let redirectUri = (process.env.LINKEDIN_REDIRECT_URI || '').trim()
-  if (redirectUri) return redirectUri
+  if (redirectUri && !redirectUri.includes('localhost:8080')) return redirectUri
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
-  if (appUrl) {
+  if (appUrl && !appUrl.includes('localhost:8080')) {
     let canonical = appUrl
     if (!canonical.includes('localhost') && !canonical.includes('127.0.0.1')) {
       canonical = canonical.replace(/^http:\/\//i, 'https://')
@@ -35,7 +35,7 @@ export function resolveLinkedInRedirectUri(requestOrigin?: string): string {
     return `${canonical}/api/linkedin/callback`
   }
 
-  if (requestOrigin) {
+  if (requestOrigin && !requestOrigin.includes('localhost:8080')) {
     let origin = requestOrigin.trim().replace(/\/+$/, '')
     if (!origin.includes('localhost') && !origin.includes('127.0.0.1')) {
       origin = origin.replace(/^http:\/\//i, 'https://')

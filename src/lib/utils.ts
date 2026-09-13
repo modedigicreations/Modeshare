@@ -77,3 +77,24 @@ export function formatDateTime(dateStr: string): string {
     minute: '2-digit',
   })
 }
+
+export function getAppOrigin(request?: { headers?: { get: (name: string) => string | null } }): string {
+  // 1. Check x-forwarded-host / host headers if valid public domain
+  if (request && typeof request.headers?.get === 'function') {
+    const forwardedHost = request.headers.get('x-forwarded-host')
+    const host = forwardedHost || request.headers.get('host')
+    const proto = request.headers.get('x-forwarded-proto') || 'https'
+    if (host && !host.includes('localhost:8080') && !host.includes('127.0.0.1:8080')) {
+      return `${proto}://${host}`.replace(/\/+$/, '')
+    }
+  }
+
+  // 2. Check NEXT_PUBLIC_APP_URL
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || '').trim().replace(/\/+$/, '')
+  if (appUrl && !appUrl.includes('localhost:8080') && !appUrl.includes('127.0.0.1:8080')) {
+    return appUrl
+  }
+
+  return 'https://modeshare.net'
+}
+
