@@ -44,14 +44,6 @@ export default function ProviderToggle({
     if (platform === 'facebook') {
       const newProvider: FacebookProvider = targetProvider === 'direct_api' ? 'facebook_api' : 'buffer'
       if (newProvider === fbProvider) return
-      if (newProvider === 'facebook_api' && !hasFacebook) {
-        setError('Please connect your Facebook account below before activating direct Facebook API scheduling.')
-        return
-      }
-      if (newProvider === 'buffer' && !hasBuffer) {
-        setError('Please connect your Buffer account below to schedule via Buffer.')
-        return
-      }
 
       setLoadingPlatform('facebook')
       try {
@@ -74,14 +66,6 @@ export default function ProviderToggle({
     if (platform === 'twitter') {
       const newProvider: TwitterProvider = targetProvider === 'direct_api' ? 'twitter_api' : 'buffer'
       if (newProvider === twProvider) return
-      if (newProvider === 'twitter_api' && !hasTwitter) {
-        setError('Please connect your Twitter / X account below before activating direct Twitter API publishing.')
-        return
-      }
-      if (newProvider === 'buffer' && !hasBuffer) {
-        setError('Please connect your Buffer account below to schedule via Buffer.')
-        return
-      }
 
       setLoadingPlatform('twitter')
       try {
@@ -104,14 +88,6 @@ export default function ProviderToggle({
     if (platform === 'linkedin') {
       const newProvider: LinkedInProvider = targetProvider === 'direct_api' ? 'linkedin_api' : 'buffer'
       if (newProvider === liProvider) return
-      if (newProvider === 'linkedin_api' && !hasLinkedIn) {
-        setError('Please connect your LinkedIn account below before activating direct LinkedIn API publishing.')
-        return
-      }
-      if (newProvider === 'buffer' && !hasBuffer) {
-        setError('Please connect your Buffer account below to schedule via Buffer.')
-        return
-      }
 
       setLoadingPlatform('linkedin')
       try {

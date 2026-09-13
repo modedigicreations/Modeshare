@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 
 const providerSchema = z.object({
@@ -22,11 +23,12 @@ export async function PATCH(request: NextRequest) {
 
     const { facebook_provider, twitter_provider, linkedin_provider } = parsed.data
     const updateData: Record<string, string> = {}
+    const db = process.env.SUPABASE_SERVICE_ROLE_KEY ? createAdminClient() : supabase
 
     // 1. Facebook verification
     if (facebook_provider) {
       if (facebook_provider === 'facebook_api') {
-        const { data: fbConn } = await supabase
+        const { data: fbConn } = await db
           .from('facebook_connections')
           .select('id')
           .eq('user_id', user.id)
@@ -45,7 +47,7 @@ export async function PATCH(request: NextRequest) {
     // 2. Twitter verification
     if (twitter_provider) {
       if (twitter_provider === 'twitter_api') {
-        const { data: twConn } = await supabase
+        const { data: twConn } = await db
           .from('twitter_connections')
           .select('id')
           .eq('user_id', user.id)
@@ -64,7 +66,7 @@ export async function PATCH(request: NextRequest) {
     // 3. LinkedIn verification
     if (linkedin_provider) {
       if (linkedin_provider === 'linkedin_api') {
-        const { data: liConn } = await supabase
+        const { data: liConn } = await db
           .from('linkedin_connections')
           .select('id')
           .eq('user_id', user.id)
@@ -84,7 +86,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'No provider specified to update' }, { status: 400 })
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await db
       .from('profiles')
       .update(updateData)
       .eq('id', user.id)
