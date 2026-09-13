@@ -25,7 +25,17 @@ export async function GET() {
       return NextResponse.json({ error: 'No LinkedIn connection found' }, { status: 404 })
     }
 
-    const accounts = await getLinkedInPages(conn.access_token)
+    const fetchedAccounts = await getLinkedInPages(conn.access_token)
+    const accounts = [...fetchedAccounts]
+
+    if (conn.account_id && !accounts.some((a) => a.id === conn.account_id)) {
+      accounts.push({
+        id: conn.account_id,
+        name: conn.account_name || (conn.account_type === 'organization' ? 'LinkedIn Organization' : 'LinkedIn Member'),
+        type: conn.account_type || (conn.account_id.includes('organization') ? 'organization' : 'person'),
+      })
+    }
+
     return NextResponse.json({
       accounts: accounts.map((a) => ({
         id: a.id,

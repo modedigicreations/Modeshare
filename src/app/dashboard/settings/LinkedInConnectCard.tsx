@@ -180,35 +180,71 @@ export default function LinkedInConnectCard({
                 {loadingAccounts ? (
                   <div className="flex items-center gap-2 text-xs text-gray-400 py-1.5">
                     <RefreshCw size={12} className="animate-spin text-[#0A66C2]" />
-                    Loading LinkedIn Pages...
-                  </div>
-                ) : accounts.length > 1 ? (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedAccountId}
-                      onChange={(e) => handleAccountChange(e.target.value)}
-                      disabled={switchingAccount}
-                      aria-label="Select Active LinkedIn Account"
-                      className="text-sm font-medium text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 flex-1 focus:ring-2 focus:ring-[#0A66C2] focus:outline-none"
-                    >
-                      {accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.type === 'organization' ? '🏢 ' : '👤 '}
-                          {a.name} ({a.type})
-                        </option>
-                      ))}
-                    </select>
-                    {switchingAccount && <RefreshCw size={14} className="animate-spin text-[#0A66C2]" />}
+                    Loading LinkedIn accounts...
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-sm bg-blue-50/50 border border-blue-100 rounded-lg px-3 py-2 text-gray-800">
-                    {accountType === 'organization' ? (
-                      <Building2 size={15} className="text-[#0A66C2]" />
-                    ) : (
-                      <User size={15} className="text-[#0A66C2]" />
+                  <div className="space-y-2.5">
+                    {accounts.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={selectedAccountId}
+                          onChange={(e) => handleAccountChange(e.target.value)}
+                          disabled={switchingAccount}
+                          aria-label="Select Active LinkedIn Account"
+                          className="text-sm font-medium text-gray-800 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 flex-1 focus:ring-2 focus:ring-[#0A66C2] focus:outline-none"
+                        >
+                          {accounts.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.type === 'organization' ? '🏢 ' : '👤 '}
+                              {a.name} ({a.type === 'organization' ? 'Company Page' : 'Personal Profile'})
+                            </option>
+                          ))}
+                        </select>
+                        {switchingAccount && <RefreshCw size={14} className="animate-spin text-[#0A66C2]" />}
+                      </div>
                     )}
-                    <span className="font-semibold">{accountName || 'LinkedIn Account'}</span>
-                    {accountId && <span className="text-xs text-gray-400 font-mono">({accountId})</span>}
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      {/* If currently an organization, provide instant switch to personal profile */}
+                      {accountType === 'organization' || selectedAccountId.includes('organization') ? (
+                        <button
+                          type="button"
+                          disabled={switchingAccount}
+                          onClick={() => {
+                            const personAcc = accounts.find((a) => a.type === 'person')
+                            if (personAcc) {
+                              handleAccountChange(personAcc.id)
+                            } else {
+                              handleAccountChange('urn:li:person:me')
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-[#0A66C2] hover:bg-blue-100 transition-colors border border-blue-200 cursor-pointer"
+                        >
+                          <User size={13} />
+                          Switch to Personal Profile
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={switchingAccount}
+                          onClick={() => {
+                            const orgAcc = accounts.find((a) => a.type === 'organization')
+                            if (orgAcc) {
+                              handleAccountChange(orgAcc.id)
+                            } else {
+                              const orgId = prompt('Enter LinkedIn Organization ID (e.g. 74760541):', '74760541')
+                              if (orgId && orgId.trim()) {
+                                handleAccountChange(`urn:li:organization:${orgId.trim()}`)
+                              }
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 text-[#0A66C2] hover:bg-blue-100 transition-colors border border-blue-200 cursor-pointer"
+                        >
+                          <Building2 size={13} />
+                          Switch to Company Page
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -234,7 +270,7 @@ export default function LinkedInConnectCard({
                 className="text-xs font-medium text-[#0A66C2] hover:underline inline-flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw size={12} />
-                Reconnect or switch account
+                Reconnect via 1-Click OAuth
               </a>
               <Button
                 variant="ghost"
