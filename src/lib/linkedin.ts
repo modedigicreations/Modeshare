@@ -377,58 +377,66 @@ export async function postLinkedInShare(
   let lastError = ''
 
   for (const currentAuthor of authorsToTry) {
-    // Strategy A: LinkedIn Versioned Posts REST API
+    // Strategy A: LinkedIn Modern REST API with minimal clean payload
+    const isOrg = currentAuthor.includes('organization')
     const restUrl = 'https://api.linkedin.com/rest/posts'
-    const restBody = {
-      author: currentAuthor,
-      commentary: text,
-      visibility: 'PUBLIC',
-      distribution: {
-        feedDistribution: 'MAIN_FEED',
-        targetEntities: [],
-        thirdPartyDistributionChannels: [],
+    const restPayloads = [
+      {
+        author: currentAuthor,
+        commentary: text,
+        visibility: 'PUBLIC',
+        lifecycleState: 'PUBLISHED',
       },
-      lifecycleState: 'PUBLISHED',
-      isReshareDisabledByAuthor: false,
-    }
+      {
+        author: currentAuthor,
+        commentary: text,
+        visibility: 'PUBLIC',
+        distribution: {
+          feedDistribution: 'MAIN_FEED',
+        },
+        lifecycleState: 'PUBLISHED',
+        isReshareDisabledByAuthor: false,
+      },
+    ]
 
-    for (const version of candidateVersions) {
-      try {
-        const res = await fetch(restUrl, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${cleanToken}`,
-            'Content-Type': 'application/json',
-            'LinkedIn-Version': version,
-            'X-Restli-Protocol-Version': '2.0.0',
-          },
-          body: JSON.stringify(restBody),
-        })
-
-        if (res.status === 201 || res.ok) {
-          const postId = res.headers.get('x-restli-id') || res.headers.get('x-linkedin-id')
-          if (postId) return { id: postId }
-          try {
-            const json = await res.json()
-            if (json.id) return { id: json.id }
-          } catch {}
-          return { id: `urn:li:share:${Date.now()}` }
-        }
-
-        const errText = await res.text()
+    for (const restBody of restPayloads) {
+      for (const version of candidateVersions) {
         try {
-          const parsed = JSON.parse(errText)
-          lastError = parsed.message || errText
-        } catch {
-          lastError = errText
-        }
+          const res = await fetch(restUrl, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${cleanToken}`,
+              'Content-Type': 'application/json',
+              'LinkedIn-Version': version,
+              'X-Restli-Protocol-Version': '2.0.0',
+            },
+            body: JSON.stringify(restBody),
+          })
 
-        // If error is not version-related, don't cycle versions
-        if (!lastError.toLowerCase().includes('not active') && !lastError.toLowerCase().includes('version')) {
-          break
+          if (res.status === 201 || res.ok) {
+            const postId = res.headers.get('x-restli-id') || res.headers.get('x-linkedin-id')
+            if (postId) return { id: postId }
+            try {
+              const json = await res.json()
+              if (json.id) return { id: json.id }
+            } catch {}
+            return { id: `urn:li:share:${Date.now()}` }
+          }
+
+          const errText = await res.text()
+          try {
+            const parsed = JSON.parse(errText)
+            lastError = parsed.message || errText
+          } catch {
+            lastError = errText
+          }
+
+          if (!lastError.toLowerCase().includes('not active') && !lastError.toLowerCase().includes('version')) {
+            break // Version was accepted, error is due to author/permissions
+          }
+        } catch (fetchErr) {
+          lastError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
         }
-      } catch (fetchErr) {
-        lastError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
       }
     }
 
@@ -476,6 +484,10 @@ export async function postLinkedInShare(
     } catch (ugcErr) {
       console.warn('LinkedIn /v2/ugcPosts error:', ugcErr)
     }
+  }
+
+  if (lastError.includes('/author')) {
+    lastError = 'LinkedIn rejected publishing to Organization. Ensure your LinkedIn App has Community Management permissions in developer.linkedin.com, or switch your active LinkedIn account to Personal Profile in Settings.'
   }
 
   throw new Error(`LinkedIn post failed: ${lastError || 'Unknown LinkedIn API error'}`)
