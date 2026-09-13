@@ -6,9 +6,11 @@ import { Card, CardHeader, CardBody } from '@/components/ui/Card'
 import { Settings, CheckCircle2, AlertCircle, ExternalLink, Sliders } from 'lucide-react'
 import BufferConnectButton from './BufferConnectButton'
 import FacebookConnectCard from './FacebookConnectCard'
+import TwitterConnectCard from './TwitterConnectCard'
+import LinkedInConnectCard from './LinkedInConnectCard'
 import ProviderToggle from './ProviderToggle'
 import RoleSwitcher from './RoleSwitcher'
-import { FacebookProvider } from '@/types/database'
+import { FacebookProvider, TwitterProvider, LinkedInProvider } from '@/types/database'
 
 export const metadata = { title: 'Settings — Modeshare' }
 
@@ -27,17 +29,17 @@ export default async function SettingsPage({ searchParams }: Props) {
     .eq('id', user.id)
     .single()
 
-  const { data: bufferConn } = await supabase
-    .from('buffer_connections')
-    .select('profile_ids, connected_at')
-    .eq('user_id', user.id)
-    .single()
+  const [bufferRes, fbRes, twRes, liRes] = await Promise.all([
+    supabase.from('buffer_connections').select('*').eq('user_id', user.id).single(),
+    supabase.from('facebook_connections').select('*').eq('user_id', user.id).single(),
+    supabase.from('twitter_connections').select('*').eq('user_id', user.id).single(),
+    supabase.from('linkedin_connections').select('*').eq('user_id', user.id).single(),
+  ])
 
-  const { data: facebookConn } = await supabase
-    .from('facebook_connections')
-    .select('page_id, page_name, connected_at')
-    .eq('user_id', user.id)
-    .single()
+  const bufferConn = bufferRes.data
+  const facebookConn = fbRes.data
+  const twitterConn = twRes.data
+  const linkedinConn = liRes.data
 
   const params = await searchParams
   const bufferAuthUrl = '/api/buffer/connect'
@@ -54,8 +56,16 @@ export default async function SettingsPage({ searchParams }: Props) {
 
   const hasBuffer = !!bufferConn
   const hasFacebook = !!facebookConn
-  const currentProvider = (profile?.facebook_provider as FacebookProvider) || 'buffer'
+  const hasTwitter = !!twitterConn
+  const hasLinkedIn = !!linkedinConn
+
+  const currentFbProvider = (profile?.facebook_provider as FacebookProvider) || 'buffer'
+  const currentTwProvider = (profile?.twitter_provider as TwitterProvider) || 'buffer'
+  const currentLiProvider = (profile?.linkedin_provider as LinkedInProvider) || 'buffer'
+
   const isFbConfigured = !!(process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET)
+  const isTwConfigured = !!(process.env.TWITTER_CLIENT_ID)
+  const isLiConfigured = !!(process.env.LINKEDIN_CLIENT_ID && process.env.LINKEDIN_CLIENT_SECRET)
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -82,6 +92,18 @@ export default async function SettingsPage({ searchParams }: Props) {
           Facebook Page connected successfully!
         </div>
       )}
+      {params.success === 'twitter_connected' && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3">
+          <CheckCircle2 size={16} />
+          Twitter / X account connected successfully!
+        </div>
+      )}
+      {params.success === 'linkedin_connected' && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3">
+          <CheckCircle2 size={16} />
+          LinkedIn account connected successfully!
+        </div>
+      )}
       {params.error && (
         <div className="space-y-1 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
           <div className="flex items-center gap-2">
@@ -97,7 +119,15 @@ export default async function SettingsPage({ searchParams }: Props) {
                       ? 'No Facebook Pages found. You need to administer at least one Page.'
                       : params.error === 'facebook_callback_failed'
                         ? 'Could not complete Facebook connection.'
-                        : params.error}
+                        : params.error === 'twitter_auth_failed'
+                          ? 'Twitter / X authorization failed.'
+                          : params.error === 'twitter_callback_failed'
+                            ? 'Could not complete Twitter / X connection.'
+                            : params.error === 'linkedin_auth_failed'
+                              ? 'LinkedIn authorization failed.'
+                              : params.error === 'linkedin_callback_failed'
+                                ? 'Could not complete LinkedIn connection.'
+                                : params.error}
             </span>
           </div>
           {params.details && (
@@ -129,7 +159,7 @@ export default async function SettingsPage({ searchParams }: Props) {
         </CardBody>
       </Card>
 
-      {/* Facebook Publishing Mode Toggle */}
+      {/* Publishing Mode Toggles */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2.5">
@@ -137,18 +167,22 @@ export default async function SettingsPage({ searchParams }: Props) {
               <Sliders size={18} />
             </div>
             <div>
-              <h2 className="font-semibold text-gray-800">Facebook Scheduling Provider</h2>
+              <h2 className="font-semibold text-gray-800">Publishing Providers</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                Toggle whether Facebook posts are scheduled via Buffer or direct Facebook API
+                Toggle whether posts are routed via Buffer or directly through platform APIs
               </p>
             </div>
           </div>
         </CardHeader>
         <CardBody>
           <ProviderToggle
-            initialProvider={currentProvider}
+            initialFacebookProvider={currentFbProvider}
+            initialTwitterProvider={currentTwProvider}
+            initialLinkedInProvider={currentLiProvider}
             hasBuffer={hasBuffer}
             hasFacebook={hasFacebook}
+            hasTwitter={hasTwitter}
+            hasLinkedIn={hasLinkedIn}
           />
         </CardBody>
       </Card>
@@ -161,6 +195,24 @@ export default async function SettingsPage({ searchParams }: Props) {
         connectedAt={facebookConn?.connected_at || null}
         appIdConfigured={isFbConfigured}
         appId={process.env.FACEBOOK_APP_ID || process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || ''}
+      />
+
+      {/* Direct Twitter / X API Integration */}
+      <TwitterConnectCard
+        isConnected={hasTwitter}
+        username={twitterConn?.twitter_username || null}
+        userId={twitterConn?.twitter_user_id || null}
+        connectedAt={twitterConn?.connected_at || null}
+        clientIdConfigured={isTwConfigured}
+      />
+
+      {/* Direct LinkedIn API Integration */}
+      <LinkedInConnectCard
+        isConnected={hasLinkedIn}
+        accountName={linkedinConn?.account_name || null}
+        accountId={linkedinConn?.account_id || null}
+        accountType={linkedinConn?.account_type || null}
+        clientIdConfigured={isLiConfigured}
       />
 
       {/* Buffer integration */}
@@ -254,3 +306,4 @@ export default async function SettingsPage({ searchParams }: Props) {
     </div>
   )
 }
+

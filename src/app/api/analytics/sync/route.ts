@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getPostMetrics as getBufferPostMetrics } from '@/lib/buffer'
 import { getFacebookPostMetrics } from '@/lib/facebook'
+import { getTwitterPostMetrics } from '@/lib/twitter'
+import { getLinkedInPostMetrics } from '@/lib/linkedin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,11 +19,11 @@ export async function POST(request: NextRequest) {
 
     const isSuperAdmin = profile?.role === 'super_admin'
 
-    // Fetch posts that have been pushed to Buffer or Facebook
+    // Fetch posts that have been pushed to Buffer, Facebook, Twitter, or LinkedIn
     let postsQuery = supabase
       .from('posts')
-      .select('id, user_id, buffer_post_id, facebook_post_id, published_provider')
-      .or('buffer_post_id.not.is.null,facebook_post_id.not.is.null')
+      .select('id, user_id, buffer_post_id, facebook_post_id, twitter_post_id, linkedin_post_id, published_provider')
+      .or('buffer_post_id.not.is.null,facebook_post_id.not.is.null,twitter_post_id.not.is.null,linkedin_post_id.not.is.null')
 
     if (!isSuperAdmin) {
       postsQuery = postsQuery.eq('user_id', user.id)
@@ -39,9 +41,11 @@ export async function POST(request: NextRequest) {
     const userIds = Array.from(new Set(posts.map((p) => p.user_id)))
     const bufferConnectionsMap: Record<string, string> = {}
     const facebookConnectionsMap: Record<string, string> = {}
+    const twitterConnectionsMap: Record<string, string> = {}
+    const linkedinConnectionsMap: Record<string, string> = {}
 
     if (userIds.length > 0) {
-      const [bufferRes, fbRes] = await Promise.all([
+      const [bufferRes, fbRes, twRes, liRes] = await Promise.all([
         supabase
           .from('buffer_connections')
           .select('user_id, access_token')
@@ -50,21 +54,37 @@ export async function POST(request: NextRequest) {
           .from('facebook_connections')
           .select('user_id, page_access_token')
           .in('user_id', userIds),
+        supabase
+          .from('twitter_connections')
+          .select('user_id, access_token')
+          .in('user_id', userIds),
+        supabase
+          .from('linkedin_connections')
+          .select('user_id, access_token')
+          .in('user_id', userIds),
       ])
 
       if (bufferRes.data) {
         for (const conn of bufferRes.data) {
-          if (conn.access_token) {
-            bufferConnectionsMap[conn.user_id] = conn.access_token
-          }
+          if (conn.access_token) bufferConnectionsMap[conn.user_id] = conn.access_token
         }
       }
 
       if (fbRes.data) {
         for (const conn of fbRes.data) {
-          if (conn.page_access_token) {
-            facebookConnectionsMap[conn.user_id] = conn.page_access_token
-          }
+          if (conn.page_access_token) facebookConnectionsMap[conn.user_id] = conn.page_access_token
+        }
+      }
+
+      if (twRes.data) {
+        for (const conn of twRes.data) {
+          if (conn.access_token) twitterConnectionsMap[conn.user_id] = conn.access_token
+        }
+      }
+
+      if (liRes.data) {
+        for (const conn of liRes.data) {
+          if (conn.access_token) linkedinConnectionsMap[conn.user_id] = conn.access_token
         }
       }
     }
@@ -79,6 +99,16 @@ export async function POST(request: NextRequest) {
             const fbToken = facebookConnectionsMap[post.user_id]
             if (fbToken) {
               stats = await getFacebookPostMetrics(fbToken, post.facebook_post_id)
+            }
+          } else if (post.twitter_post_id) {
+            const twToken = twitterConnectionsMap[post.user_id]
+            if (twToken) {
+              stats = await getTwitterPostMetrics(twToken, post.twitter_post_id)
+            }
+          } else if (post.linkedin_post_id) {
+            const liToken = linkedinConnectionsMap[post.user_id]
+            if (liToken) {
+              stats = await getLinkedInPostMetrics(liToken, post.linkedin_post_id)
             }
           } else if (post.buffer_post_id) {
             const bufferToken = bufferConnectionsMap[post.user_id]

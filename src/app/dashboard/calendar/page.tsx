@@ -14,7 +14,7 @@ export default async function CalendarPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, facebook_provider')
+    .select('role, facebook_provider, twitter_provider, linkedin_provider')
     .eq('id', user.id)
     .single()
 
@@ -43,6 +43,8 @@ export default async function CalendarPage() {
         posts={(posts as (Post & { brief: { topic: string } })[]) || []}
         userRole={profile?.role as UserRole}
         facebookProvider={profile?.facebook_provider}
+        twitterProvider={profile?.twitter_provider}
+        linkedinProvider={profile?.linkedin_provider}
       />
     </div>
   )

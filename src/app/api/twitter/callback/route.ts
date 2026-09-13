@@ -1,0 +1,83 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { exchangeTwitterCode } from '@/lib/twitter'
+import { cookies } from 'next/headers'
+
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams
+    const code = searchParams.get('code')
+    const state = searchParams.get('state')
+    const error = searchParams.get('error')
+
+    if (error) {
+      const errorDesc = searchParams.get('error_description') || error
+      console.error('Twitter OAuth error param:', errorDesc)
+      return NextResponse.redirect(
+        new URL(`/dashboard/settings?error=twitter_auth_failed&details=${encodeURIComponent(errorDesc)}`, request.url)
+      )
+    }
+
+    if (!code) {
+      return NextResponse.redirect(new URL('/dashboard/settings?error=twitter_no_code', request.url))
+    }
+
+    const cookieStore = await cookies()
+    const storedState = cookieStore.get('twitter_oauth_state')?.value
+    const codeVerifier = cookieStore.get('twitter_code_verifier')?.value
+
+    if (!storedState || !state || storedState !== state) {
+      return NextResponse.redirect(new URL('/dashboard/settings?error=twitter_state_mismatch', request.url))
+    }
+
+    if (!codeVerifier) {
+      return NextResponse.redirect(new URL('/dashboard/settings?error=twitter_verifier_missing', request.url))
+    }
+
+    cookieStore.delete('twitter_oauth_state')
+    cookieStore.delete('twitter_code_verifier')
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.redirect(new URL('/login?error=session_expired', request.url))
+    }
+
+    const tokenResult = await exchangeTwitterCode(code, codeVerifier, request.nextUrl.origin)
+
+    let expiresAt: string | null = null
+    if (tokenResult.expiresIn) {
+      expiresAt = new Date(Date.now() + tokenResult.expiresIn * 1000).toISOString()
+    }
+
+    // Upsert into twitter_connections
+    const { error: upsertErr } = await supabase.from('twitter_connections').upsert(
+      {
+        user_id: user.id,
+        access_token: tokenResult.accessToken,
+        refresh_token: tokenResult.refreshToken || null,
+        expires_at: expiresAt,
+        twitter_user_id: tokenResult.user.id,
+        twitter_username: tokenResult.user.username,
+        connected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    )
+
+    if (upsertErr) {
+      console.error('Supabase twitter_connections upsert error:', upsertErr)
+      return NextResponse.redirect(
+        new URL(`/dashboard/settings?error=twitter_db_failed&details=${encodeURIComponent(upsertErr.message)}`, request.url)
+      )
+    }
+
+    return NextResponse.redirect(new URL('/dashboard/settings?success=twitter_connected', request.url))
+  } catch (err) {
+    console.error('Twitter callback exception:', err)
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.redirect(
+      new URL(`/dashboard/settings?error=twitter_callback_failed&details=${encodeURIComponent(msg)}`, request.url)
+    )
+  }
+}

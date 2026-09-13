@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Post, Platform, PostStatus, UserRole, FacebookProvider } from '@/types/database'
+import { Post, Platform, PostStatus, UserRole, FacebookProvider, TwitterProvider, LinkedInProvider } from '@/types/database'
 import {
   PLATFORM_LABELS,
   PLATFORM_COLORS,
@@ -29,9 +29,17 @@ interface Props {
   posts: EnrichedPost[]
   userRole?: UserRole
   facebookProvider?: FacebookProvider
+  twitterProvider?: TwitterProvider
+  linkedinProvider?: LinkedInProvider
 }
 
-export default function CalendarClient({ posts, userRole, facebookProvider = 'buffer' }: Props) {
+export default function CalendarClient({
+  posts,
+  userRole,
+  facebookProvider = 'buffer',
+  twitterProvider = 'buffer',
+  linkedinProvider = 'buffer',
+}: Props) {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
@@ -241,7 +249,9 @@ export default function CalendarClient({ posts, userRole, facebookProvider = 'bu
                 <PushToBufferButton
                   postId={selectedPost.id}
                   platform={selectedPost.platform as Platform}
-                  provider={facebookProvider}
+                  facebookProvider={facebookProvider}
+                  twitterProvider={twitterProvider}
+                  linkedinProvider={linkedinProvider}
                   onSuccess={() => handleBufferSuccess(selectedPost.id)}
                 />
               </div>
@@ -274,7 +284,9 @@ export default function CalendarClient({ posts, userRole, facebookProvider = 'bu
                 <PushToBufferButton
                   postId={p.id}
                   platform={p.platform as Platform}
-                  provider={facebookProvider}
+                  facebookProvider={facebookProvider}
+                  twitterProvider={twitterProvider}
+                  linkedinProvider={linkedinProvider}
                   onSuccess={() => handleBufferSuccess(p.id)}
                 />
               </div>

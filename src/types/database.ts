@@ -2,6 +2,9 @@ export type UserRole = 'creator' | 'approver' | 'admin' | 'super_admin'
 export type Tone = 'professional' | 'casual' | 'witty' | 'informative' | 'inspirational'
 export type Platform = 'facebook' | 'twitter' | 'linkedin'
 export type FacebookProvider = 'buffer' | 'facebook_api'
+export type TwitterProvider = 'buffer' | 'twitter_api'
+export type LinkedInProvider = 'buffer' | 'linkedin_api'
+export type PublishingProvider = 'buffer' | 'facebook_api' | 'twitter_api' | 'linkedin_api'
 export type BriefStatus = 'pending_generation' | 'generated' | 'in_review' | 'approved' | 'rejected'
 export type PostStatus = 'pending_review' | 'approved' | 'rejected' | 'scheduled' | 'published'
 
@@ -12,6 +15,8 @@ export interface Profile {
   role: UserRole
   avatar_url: string | null
   facebook_provider?: FacebookProvider
+  twitter_provider?: TwitterProvider
+  linkedin_provider?: LinkedInProvider
   created_at: string
   updated_at: string
 }
@@ -46,7 +51,9 @@ export interface Post {
   published_at: string | null
   buffer_post_id: string | null
   facebook_post_id?: string | null
-  published_provider?: FacebookProvider | null
+  twitter_post_id?: string | null
+  linkedin_post_id?: string | null
+  published_provider?: PublishingProvider | null
   metrics?: {
     reactions?: number
     clicks?: number
@@ -82,6 +89,31 @@ export interface FacebookConnection {
   page_id: string
   page_name: string | null
   page_access_token: string
+  connected_at: string
+  updated_at: string
+}
+
+export interface TwitterConnection {
+  id: string
+  user_id: string
+  access_token: string
+  refresh_token?: string | null
+  expires_at?: string | null
+  twitter_user_id?: string | null
+  twitter_username?: string | null
+  connected_at: string
+  updated_at: string
+}
+
+export interface LinkedInConnection {
+  id: string
+  user_id: string
+  access_token: string
+  refresh_token?: string | null
+  expires_at?: string | null
+  account_id: string // person URN or organization URN
+  account_name: string | null
+  account_type: 'organization' | 'person'
   connected_at: string
   updated_at: string
 }

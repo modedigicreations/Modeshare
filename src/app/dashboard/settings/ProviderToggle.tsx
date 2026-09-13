@@ -1,152 +1,238 @@
 'use client'
 
 import { useState } from 'react'
-import { FacebookProvider } from '@/types/database'
-import { Layers, Zap, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { FacebookProvider, TwitterProvider, LinkedInProvider } from '@/types/database'
+import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
+import FacebookIcon from '@/components/ui/FacebookIcon'
+import TwitterIcon from '@/components/ui/TwitterIcon'
+import LinkedInIcon from '@/components/ui/LinkedInIcon'
 
 interface Props {
-  initialProvider: FacebookProvider
+  initialFacebookProvider: FacebookProvider
+  initialTwitterProvider: TwitterProvider
+  initialLinkedInProvider: LinkedInProvider
   hasBuffer: boolean
   hasFacebook: boolean
+  hasTwitter: boolean
+  hasLinkedIn: boolean
 }
 
 export default function ProviderToggle({
-  initialProvider,
+  initialFacebookProvider,
+  initialTwitterProvider,
+  initialLinkedInProvider,
   hasBuffer,
   hasFacebook,
+  hasTwitter,
+  hasLinkedIn,
 }: Props) {
-  const [provider, setProvider] = useState<FacebookProvider>(initialProvider)
-  const [loading, setLoading] = useState(false)
+  const [fbProvider, setFbProvider] = useState<FacebookProvider>(initialFacebookProvider)
+  const [twProvider, setTwProvider] = useState<TwitterProvider>(initialTwitterProvider)
+  const [liProvider, setLiProvider] = useState<LinkedInProvider>(initialLinkedInProvider)
+
+  const [loadingPlatform, setLoadingPlatform] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  async function handleToggle(newProvider: FacebookProvider) {
-    if (newProvider === provider) return
+  async function handleToggle(
+    platform: 'facebook' | 'twitter' | 'linkedin',
+    targetProvider: 'buffer' | 'direct_api'
+  ) {
     setError(null)
     setSuccessMsg(null)
 
-    if (newProvider === 'facebook_api' && !hasFacebook) {
-      setError('Please connect your Facebook account below before activating direct Facebook API scheduling.')
-      return
-    }
-
-    if (newProvider === 'buffer' && !hasBuffer) {
-      setError('Please connect your Buffer account below to schedule via Buffer.')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const res = await fetch('/api/users/provider', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ facebook_provider: newProvider }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to update publishing provider')
+    if (platform === 'facebook') {
+      const newProvider: FacebookProvider = targetProvider === 'direct_api' ? 'facebook_api' : 'buffer'
+      if (newProvider === fbProvider) return
+      if (newProvider === 'facebook_api' && !hasFacebook) {
+        setError('Please connect your Facebook account below before activating direct Facebook API scheduling.')
+        return
+      }
+      if (newProvider === 'buffer' && !hasBuffer) {
+        setError('Please connect your Buffer account below to schedule via Buffer.')
+        return
       }
 
-      setProvider(newProvider)
-      setSuccessMsg(
-        newProvider === 'facebook_api'
-          ? 'Facebook API is now your active publisher for Facebook posts.'
-          : 'Buffer is now your active publisher for Facebook posts.'
-      )
-      setTimeout(() => setSuccessMsg(null), 4000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to change provider')
-    } finally {
-      setLoading(false)
+      setLoadingPlatform('facebook')
+      try {
+        const res = await fetch('/api/users/provider', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ facebook_provider: newProvider }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to update Facebook provider')
+        setFbProvider(newProvider)
+        setSuccessMsg(`Facebook publishing mode set to ${newProvider === 'facebook_api' ? 'Direct Facebook API' : 'Buffer'}.`)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update provider')
+      } finally {
+        setLoadingPlatform(null)
+      }
+    }
+
+    if (platform === 'twitter') {
+      const newProvider: TwitterProvider = targetProvider === 'direct_api' ? 'twitter_api' : 'buffer'
+      if (newProvider === twProvider) return
+      if (newProvider === 'twitter_api' && !hasTwitter) {
+        setError('Please connect your Twitter / X account below before activating direct Twitter API publishing.')
+        return
+      }
+      if (newProvider === 'buffer' && !hasBuffer) {
+        setError('Please connect your Buffer account below to schedule via Buffer.')
+        return
+      }
+
+      setLoadingPlatform('twitter')
+      try {
+        const res = await fetch('/api/users/provider', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ twitter_provider: newProvider }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to update Twitter provider')
+        setTwProvider(newProvider)
+        setSuccessMsg(`Twitter / X publishing mode set to ${newProvider === 'twitter_api' ? 'Direct Twitter API' : 'Buffer'}.`)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update provider')
+      } finally {
+        setLoadingPlatform(null)
+      }
+    }
+
+    if (platform === 'linkedin') {
+      const newProvider: LinkedInProvider = targetProvider === 'direct_api' ? 'linkedin_api' : 'buffer'
+      if (newProvider === liProvider) return
+      if (newProvider === 'linkedin_api' && !hasLinkedIn) {
+        setError('Please connect your LinkedIn account below before activating direct LinkedIn API publishing.')
+        return
+      }
+      if (newProvider === 'buffer' && !hasBuffer) {
+        setError('Please connect your Buffer account below to schedule via Buffer.')
+        return
+      }
+
+      setLoadingPlatform('linkedin')
+      try {
+        const res = await fetch('/api/users/provider', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ linkedin_provider: newProvider }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to update LinkedIn provider')
+        setLiProvider(newProvider)
+        setSuccessMsg(`LinkedIn publishing mode set to ${newProvider === 'linkedin_api' ? 'Direct LinkedIn API' : 'Buffer'}.`)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to update provider')
+      } finally {
+        setLoadingPlatform(null)
+      }
     }
   }
 
+  const platforms = [
+    {
+      id: 'facebook' as const,
+      name: 'Facebook',
+      icon: <FacebookIcon size={16} />,
+      iconBg: 'bg-blue-600 text-white',
+      isDirectActive: fbProvider === 'facebook_api',
+      hasDirect: hasFacebook,
+      directLabel: 'Direct Meta Graph API',
+    },
+    {
+      id: 'twitter' as const,
+      name: 'Twitter / X',
+      icon: <TwitterIcon size={14} />,
+      iconBg: 'bg-black text-white',
+      isDirectActive: twProvider === 'twitter_api',
+      hasDirect: hasTwitter,
+      directLabel: 'Direct X API v2',
+    },
+    {
+      id: 'linkedin' as const,
+      name: 'LinkedIn',
+      icon: <LinkedInIcon size={14} />,
+      iconBg: 'bg-[#0A66C2] text-white',
+      isDirectActive: liProvider === 'linkedin_api',
+      hasDirect: hasLinkedIn,
+      directLabel: 'Direct LinkedIn REST API',
+    },
+  ]
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Option 1: Buffer */}
-        <button
-          type="button"
-          onClick={() => handleToggle('buffer')}
-          disabled={loading}
-          className={cn(
-            'flex-1 text-left p-4 rounded-xl border-2 transition-all relative cursor-pointer',
-            provider === 'buffer'
-              ? 'border-ms-blue bg-blue-50/40 shadow-sm'
-              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
-          )}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2.5">
-              <div
-                className={cn(
-                  'w-8 h-8 rounded-lg flex items-center justify-center',
-                  provider === 'buffer' ? 'bg-ms-blue text-white' : 'bg-gray-100 text-gray-600'
-                )}
-              >
-                <Layers size={16} />
+      <div className="space-y-3">
+        {platforms.map((p) => {
+          const isLoading = loadingPlatform === p.id
+          return (
+            <div
+              key={p.id}
+              className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-gray-200 bg-white gap-3 shadow-xs"
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${p.iconBg}`}>
+                  {p.icon}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm text-gray-900">{p.name}</span>
+                    <span
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        p.isDirectActive
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : 'bg-gray-100 text-gray-700 border border-gray-200'
+                      }`}
+                    >
+                      {p.isDirectActive ? p.directLabel : 'Buffer Queue'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {p.isDirectActive
+                      ? 'Publishes directly without Buffer queue limits'
+                      : 'Publishes via your connected Buffer account'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Buffer</h3>
-                <p className="text-xs text-gray-500">Multi-channel queue & queue manager</p>
-              </div>
-            </div>
-            {provider === 'buffer' && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-ms-blue bg-blue-100/70 px-2 py-0.5 rounded-full">
-                <CheckCircle2 size={11} /> Active
-              </span>
-            )}
-          </div>
-          <p className="mt-2.5 text-xs text-gray-600 leading-relaxed">
-            Routes Facebook, Twitter/X, and LinkedIn posts through your connected Buffer account queue.
-          </p>
-        </button>
 
-        {/* Option 2: Facebook Graph API */}
-        <button
-          type="button"
-          onClick={() => handleToggle('facebook_api')}
-          disabled={loading}
-          className={cn(
-            'flex-1 text-left p-4 rounded-xl border-2 transition-all relative cursor-pointer',
-            provider === 'facebook_api'
-              ? 'border-blue-600 bg-blue-50/40 shadow-sm'
-              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/50'
-          )}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2.5">
-              <div
-                className={cn(
-                  'w-8 h-8 rounded-lg flex items-center justify-center font-bold',
-                  provider === 'facebook_api' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'
-                )}
-              >
-                <Zap size={16} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900">Direct Facebook API</h3>
-                <p className="text-xs text-gray-500">Official Meta Graph API</p>
+              {/* Segmented Controller Switch */}
+              <div className="flex bg-gray-100 p-0.5 rounded-lg shrink-0 self-start sm:self-auto border border-gray-200">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleToggle(p.id, 'buffer')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
+                    !p.isDirectActive
+                      ? 'bg-white text-gray-900 shadow-xs font-semibold'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Buffer
+                </button>
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => handleToggle(p.id, 'direct_api')}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition cursor-pointer ${
+                    p.isDirectActive
+                      ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  Direct API
+                </button>
               </div>
             </div>
-            {provider === 'facebook_api' && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 bg-blue-100/70 px-2 py-0.5 rounded-full">
-                <CheckCircle2 size={11} /> Active
-              </span>
-            )}
-          </div>
-          <p className="mt-2.5 text-xs text-gray-600 leading-relaxed">
-            Directly schedules and publishes Facebook Page posts via Meta Graph API without Buffer limits.
-          </p>
-        </button>
+          )
+        })}
       </div>
 
-      {loading && (
+      {loadingPlatform && (
         <div className="flex items-center gap-2 text-xs text-gray-500">
-          <RefreshCw size={12} className="animate-spin text-ms-blue" />
-          Updating default publishing provider...
+          <RefreshCw size={12} className="animate-spin text-blue-600" />
+          Updating publishing provider...
         </div>
       )}
 

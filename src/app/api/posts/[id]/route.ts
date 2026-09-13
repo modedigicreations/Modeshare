@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { rewritePost } from '@/lib/deepseek'
 import { scheduleBufferPost } from '@/lib/buffer'
 import { scheduleFacebookPost } from '@/lib/facebook'
+import { postTweet } from '@/lib/twitter'
+import { postLinkedInShare } from '@/lib/linkedin'
 import { Platform } from '@/types/database'
 
 const updateSchema = z.discriminatedUnion('action', [
@@ -40,7 +42,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Only approvers/admins can act on posts
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role, facebook_provider')
+      .select('role, facebook_provider, twitter_provider, linkedin_provider')
       .eq('id', user.id)
       .single()
 
@@ -113,15 +115,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       let autoScheduled = false
       let autoScheduleError: string | null = null
-      let bufferId: string | null = null
-      let facebookPostId: string | null = null
 
       try {
         const platform = post.platform as Platform
-        const currentFbProvider = profile?.facebook_provider || 'buffer'
+        const fbProvider = profile?.facebook_provider || 'buffer'
+        const twProvider = profile?.twitter_provider || 'buffer'
+        const liProvider = profile?.linkedin_provider || 'buffer'
 
-        if (platform === 'facebook' && currentFbProvider === 'facebook_api') {
-          // Direct Facebook API Auto-Scheduling on Approval
+        if (platform === 'facebook' && fbProvider === 'facebook_api') {
+          // Direct Facebook API Auto-Scheduling
           let { data: fbConn } = await supabase
             .from('facebook_connections')
             .select('*')
@@ -145,13 +147,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
               post.scheduled_at
             )
 
-            facebookPostId = fbResult.id
-
             const { data: updatedPost, error: updateErr } = await supabase
               .from('posts')
               .update({
                 status: fbResult.isScheduled ? 'scheduled' : 'published',
-                facebook_post_id: facebookPostId,
+                facebook_post_id: fbResult.id,
                 published_provider: 'facebook_api',
                 scheduled_at: post.scheduled_at || new Date().toISOString(),
                 published_at: fbResult.isScheduled ? null : new Date().toISOString(),
@@ -165,8 +165,82 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
               autoScheduled = true
             }
           }
+        } else if (platform === 'twitter' && twProvider === 'twitter_api') {
+          // Direct Twitter API Auto-Publishing
+          let { data: twConn } = await supabase
+            .from('twitter_connections')
+            .select('*')
+            .eq('user_id', user.id)
+            .single()
+
+          if (!twConn) {
+            const { data: authorConn } = await supabase
+              .from('twitter_connections')
+              .select('*')
+              .eq('user_id', post.user_id)
+              .single()
+            if (authorConn) twConn = authorConn
+          }
+
+          if (twConn && twConn.access_token) {
+            const twResult = await postTweet(twConn.access_token, post.content)
+            const { data: updatedPost, error: updateErr } = await supabase
+              .from('posts')
+              .update({
+                status: 'published',
+                twitter_post_id: twResult.id,
+                published_provider: 'twitter_api',
+                scheduled_at: post.scheduled_at || new Date().toISOString(),
+                published_at: new Date().toISOString(),
+              })
+              .eq('id', id)
+              .select()
+              .single()
+
+            if (!updateErr && updatedPost) {
+              post = updatedPost
+              autoScheduled = true
+            }
+          }
+        } else if (platform === 'linkedin' && liProvider === 'linkedin_api') {
+          // Direct LinkedIn API Auto-Publishing
+          let { data: liConn } = await supabase
+            .from('linkedin_connections')
+            .select('*')
+            .eq('user_id', user.id)
+            .single()
+
+          if (!liConn) {
+            const { data: authorConn } = await supabase
+              .from('linkedin_connections')
+              .select('*')
+              .eq('user_id', post.user_id)
+              .single()
+            if (authorConn) liConn = authorConn
+          }
+
+          if (liConn && liConn.access_token && liConn.account_id) {
+            const liResult = await postLinkedInShare(liConn.access_token, liConn.account_id, post.content)
+            const { data: updatedPost, error: updateErr } = await supabase
+              .from('posts')
+              .update({
+                status: 'published',
+                linkedin_post_id: liResult.id,
+                published_provider: 'linkedin_api',
+                scheduled_at: post.scheduled_at || new Date().toISOString(),
+                published_at: new Date().toISOString(),
+              })
+              .eq('id', id)
+              .select()
+              .single()
+
+            if (!updateErr && updatedPost) {
+              post = updatedPost
+              autoScheduled = true
+            }
+          }
         } else {
-          // Buffer Auto-Scheduling
+          // Buffer Auto-Scheduling Fallback
           let { data: bufferConn } = await supabase
             .from('buffer_connections')
             .select('*')
@@ -190,7 +264,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           }
 
           if (profileId && bufferConn) {
-            bufferId = await scheduleBufferPost(
+            const bufferId = await scheduleBufferPost(
               bufferConn.access_token,
               profileId,
               post.content,
