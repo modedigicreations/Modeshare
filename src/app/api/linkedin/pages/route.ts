@@ -78,10 +78,27 @@ export async function POST(request: NextRequest) {
     }
 
     const accounts = await getLinkedInPages(conn.access_token)
-    const targetAccount = accounts.find((a) => a.id === accountId) || {
-      id: accountId,
-      name: accountId.includes('organization') ? 'LinkedIn Organization' : 'LinkedIn Profile',
-      type: accountId.includes('organization') ? ('organization' as const) : ('person' as const),
+    let targetAccount = accounts.find((a) => a.id === accountId)
+
+    if (!targetAccount) {
+      if (accountId.includes('person')) {
+        const personAcc = accounts.find((a) => a.type === 'person')
+        if (personAcc) {
+          targetAccount = personAcc
+        } else {
+          targetAccount = {
+            id: accountId,
+            name: 'LinkedIn Personal Profile',
+            type: 'person' as const,
+          }
+        }
+      } else {
+        targetAccount = {
+          id: accountId,
+          name: accountId.includes('organization') ? 'LinkedIn Organization' : 'LinkedIn Profile',
+          type: accountId.includes('organization') ? ('organization' as const) : ('person' as const),
+        }
+      }
     }
 
     const { error: updateError } = await db

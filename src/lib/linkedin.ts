@@ -53,14 +53,12 @@ export function getLinkedInAuthUrl(state: string, requestOrigin?: string): strin
   const clientId = (process.env.LINKEDIN_CLIENT_ID || process.env.NEXT_PUBLIC_LINKEDIN_CLIENT_ID || '').trim()
   const redirectUri = resolveLinkedInRedirectUri(requestOrigin)
 
-  // Comprehensive scopes for Member + Company Page (Community Management API)
+  // Authorized LinkedIn scopes for 'Share on LinkedIn' and 'Sign In with LinkedIn using OpenID Connect'
   const scopes = [
     'openid',
     'profile',
     'email',
     'w_member_social',
-    'w_organization_social',
-    'r_organization_social',
   ].join(' ')
 
   const params = new URLSearchParams({
@@ -314,36 +312,9 @@ export async function postLinkedInShare(
 ): Promise<{ id: string }> {
   const cleanToken = accessToken.trim()
 
-  // Active LinkedIn REST API versions currently supported by LinkedIn
-  const candidateVersions = [
-    '202502',
-    '202501',
-    '202412',
-    '202411',
-    '202410',
-    '202409',
-    '202408',
-    '202407',
-    '202406',
-    '202405',
-    '202404',
-    '202403',
-  ]
-
-  // Resolve author URN options (primary target, plus personal member fallback)
-  const authorsToTry: string[] = []
-  if (authorUrn && authorUrn.trim()) {
-    const raw = authorUrn.trim()
-    const formatted = raw.startsWith('urn:li:')
-      ? raw
-      : /^\d+$/.test(raw)
-        ? `urn:li:organization:${raw}`
-        : `urn:li:person:${raw}`
-    authorsToTry.push(formatted)
-  }
-
-  // Fetch authenticated personal member URN as fallback
+  // Always resolve the real member URN first from /v2/userinfo
   let memberUrn: string | null = null
+  let memberName: string | null = null
   try {
     const userinfoRes = await fetch('https://api.linkedin.com/v2/userinfo', {
       headers: { Authorization: `Bearer ${cleanToken}` },
@@ -352,6 +323,7 @@ export async function postLinkedInShare(
       const uData = await userinfoRes.json()
       if (uData.sub) {
         memberUrn = `urn:li:person:${uData.sub}`
+        memberName = uData.name || `${uData.given_name || ''} ${uData.family_name || ''}`.trim()
       }
     }
   } catch {}
@@ -368,6 +340,22 @@ export async function postLinkedInShare(
     } catch {}
   }
 
+  // Resolve author URN options (primary target, plus personal member fallback)
+  const authorsToTry: string[] = []
+  if (authorUrn && authorUrn.trim()) {
+    const raw = authorUrn.trim()
+    if (raw === 'urn:li:person:me' || raw === 'me' || raw === 'person') {
+      if (memberUrn) authorsToTry.push(memberUrn)
+    } else {
+      const formatted = raw.startsWith('urn:li:')
+        ? raw
+        : /^\d+$/.test(raw)
+          ? `urn:li:organization:${raw}`
+          : `urn:li:person:${raw}`
+      authorsToTry.push(formatted)
+    }
+  }
+
   if (memberUrn && !authorsToTry.includes(memberUrn)) {
     authorsToTry.push(memberUrn)
   }
@@ -375,6 +363,22 @@ export async function postLinkedInShare(
   if (authorsToTry.length === 0) {
     authorsToTry.push('urn:li:organization:74760541')
   }
+
+  // Active LinkedIn REST API versions currently supported by LinkedIn
+  const candidateVersions = [
+    '202502',
+    '202501',
+    '202412',
+    '202411',
+    '202410',
+    '202409',
+    '202408',
+    '202407',
+    '202406',
+    '202405',
+    '202404',
+    '202403',
+  ]
 
   let lastError = ''
 
