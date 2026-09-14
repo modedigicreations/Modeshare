@@ -379,6 +379,16 @@ export async function postLinkedInShare(
     '202403',
   ]
 
+  function checkDuplicate(errText: string): { id: string } | null {
+    if (!errText) return null
+    const match = errText.match(/duplicate of (urn:li:[^\s,;]+|\d+)/i)
+    if (match && match[1]) {
+      const existingId = match[1].startsWith('urn:li:') ? match[1] : `urn:li:share:${match[1]}`
+      return { id: existingId }
+    }
+    return null
+  }
+
   let lastError = ''
 
   for (const currentAuthor of authorsToTry) {
@@ -429,12 +439,18 @@ export async function postLinkedInShare(
           }
 
           const errText = await res.text()
+          const dup = checkDuplicate(errText)
+          if (dup) return dup
+
           try {
             const parsed = JSON.parse(errText)
-            lastError = parsed.message || errText
+            lastError = parsed.message || parsed.error || errText
           } catch {
             lastError = errText
           }
+
+          const dupParsed = checkDuplicate(lastError)
+          if (dupParsed) return dupParsed
 
           if (!lastError.toLowerCase().includes('not active') && !lastError.toLowerCase().includes('version')) {
             break // Version was accepted, error is due to author/permissions
@@ -481,10 +497,16 @@ export async function postLinkedInShare(
         if (ugcHeaderId) return { id: ugcHeaderId }
       } else {
         const ugcErrText = await ugcRes.text()
+        const dup = checkDuplicate(ugcErrText)
+        if (dup) return dup
         try {
           const parsedUgc = JSON.parse(ugcErrText)
-          if (parsedUgc.message) lastError = parsedUgc.message
-        } catch {}
+          lastError = parsedUgc.message || parsedUgc.error || ugcErrText
+        } catch {
+          lastError = ugcErrText
+        }
+        const dupParsed = checkDuplicate(lastError)
+        if (dupParsed) return dupParsed
       }
     } catch (ugcErr) {
       console.warn('LinkedIn /v2/ugcPosts error:', ugcErr)
@@ -522,15 +544,25 @@ export async function postLinkedInShare(
         if (sharesHeaderId) return { id: sharesHeaderId }
       } else {
         const sharesErrText = await sharesRes.text()
+        const dup = checkDuplicate(sharesErrText)
+        if (dup) return dup
         try {
           const parsedShares = JSON.parse(sharesErrText)
-          if (parsedShares.message) lastError = parsedShares.message
-        } catch {}
+          lastError = parsedShares.message || parsedShares.error || sharesErrText
+        } catch {
+          lastError = sharesErrText
+        }
+        const dupParsed = checkDuplicate(lastError)
+        if (dupParsed) return dupParsed
       }
     } catch (sharesErr) {
       console.warn('LinkedIn /v2/shares error:', sharesErr)
     }
   }
+
+  // Gracefully handle duplicate post error by linking existing published LinkedIn share
+  const dupFinal = checkDuplicate(lastError)
+  if (dupFinal) return dupFinal
 
   throw new Error(`LinkedIn post failed: ${lastError || 'Unknown LinkedIn API error'}`)
 }
